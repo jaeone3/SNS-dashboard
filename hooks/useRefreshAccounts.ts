@@ -57,7 +57,7 @@ export function useRefreshAccounts() {
 
   /** Apply non-null scrape fields to the store. */
   const applyScrapeResult = useCallback(
-    (accountId: string, data: ScrapeResult) => {
+    async (accountId: string, data: ScrapeResult) => {
       const updates: Partial<Record<string, unknown>> = {};
       if (data.followers !== null) updates.followers = data.followers;
       if (data.lastPostDate !== null) updates.lastPostDate = data.lastPostDate;
@@ -65,7 +65,7 @@ export function useRefreshAccounts() {
       if (data.lastPostLike !== null) updates.lastPostLike = data.lastPostLike;
       if (data.lastPostSave !== null) updates.lastPostSave = data.lastPostSave;
       if (Object.keys(updates).length > 0) {
-        updateAccount(accountId, updates);
+        await updateAccount(accountId, updates);
       }
     },
     [updateAccount]
@@ -88,7 +88,7 @@ export function useRefreshAccounts() {
         try {
           const data = await scrapeAccount(accountId);
           if (data) {
-            applyScrapeResult(accountId, data);
+            await applyScrapeResult(accountId, data);
             // If lastPostView is still exactly 0, assign shadowban tag
             if (data.lastPostView === 0) {
               const shadowbanTag = tags.find((t) => t.label === SHADOWBAN_TAG_LABEL);
@@ -130,7 +130,7 @@ export function useRefreshAccounts() {
       try {
         const data = await scrapeAccount(accountId);
         if (data) {
-          applyScrapeResult(accountId, data);
+          await applyScrapeResult(accountId, data);
 
           // Shadowban detection: if lastPostView is exactly 0, schedule re-check
           if (data.lastPostView === 0) {
