@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  scrapeTikTok,
+  scrapeTikTokWithRetry,
   scrapeInstagram,
   scrapeYouTube,
   scrapeFacebook,
@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
 
     switch (platform.toLowerCase()) {
       case "tiktok":
-        result = await scrapeTikTok(username);
+        // Use retry logic for TikTok (5 attempts to maximize data completeness)
+        result = await scrapeTikTokWithRetry(username, 5);
         break;
       case "instagram":
         result = await scrapeInstagram(username);

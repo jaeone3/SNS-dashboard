@@ -337,14 +337,16 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
 
   updateAccount: async (id, data) => {
     const updatedData = { ...data, updatedAt: nowISO() };
-    await apiFetch("/api/accounts", {
+    const res = await apiFetch("/api/accounts", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...updatedData }),
     });
+    // Use the actual API response to update the store
+    const apiResponse = await res.json();
     set((state) => ({
       accounts: state.accounts.map((a) =>
-        a.id === id ? { ...a, ...updatedData } : a
+        a.id === id ? { ...a, ...apiResponse } : a
       ),
     }));
   },

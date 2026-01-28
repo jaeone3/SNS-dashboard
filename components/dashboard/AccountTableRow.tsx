@@ -37,7 +37,7 @@ export const AccountTableRow = ({
   // Subtle platform brand color for row background
   const platformBg: Record<string, string> = {
     tiktok: "rgba(0,0,0,0.03)",
-    instagram: "rgba(228,64,95,0.05)",
+    instagram: "rgba(193,53,132,0.07)", // Instagram gradient purple-pink
     youtube: "rgba(255,0,0,0.04)",
     facebook: "rgba(24,119,242,0.05)",
   };

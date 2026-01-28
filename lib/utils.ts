@@ -68,7 +68,10 @@ const SNS_PATTERNS: {
   {
     platformName: "facebook",
     patterns: [
-      /(?:https?:\/\/)?(?:www\.)?facebook\.com\/([a-zA-Z0-9_.]+)\/?/i,
+      // ID-based profile: profile.php?id=123456789 (with any params after)
+      /(?:https?:\/\/)?(?:www\.)?facebook\.com\/profile\.php\?id=(\d+)/i,
+      // Username-based profile: facebook.com/username (must come last as fallback)
+      /(?:https?:\/\/)?(?:www\.)?facebook\.com\/([a-zA-Z0-9_.]+)(?:\/|\?|$)/i,
     ],
   },
 ];

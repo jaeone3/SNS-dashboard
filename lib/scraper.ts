@@ -29,12 +29,34 @@ let _browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (!_browser || !_browser.isConnected()) {
+    // Set headless to false for debugging (can see what's happening)
+    // Set to true for production
+    const isDebug = process.env.SCRAPER_DEBUG === "true";
     _browser = await chromium.launch({
-      headless: true,
+      headless: !isDebug,
       args: [
         "--disable-blink-features=AutomationControlled",
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process",
+        "--disable-dev-shm-usage",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-breakpad",
+        "--disable-component-extensions-with-background-pages",
+        "--disable-extensions",
+        "--disable-features=TranslateUI",
+        "--disable-ipc-flooding-protection",
+        "--disable-renderer-backgrounding",
+        "--enable-features=NetworkService,NetworkServiceInProcess",
+        "--force-color-profile=srgb",
+        "--hide-scrollbars",
+        "--metrics-recording-only",
+        "--mute-audio",
       ],
     });
   }
@@ -43,12 +65,141 @@ async function getBrowser(): Promise<Browser> {
 
 async function newContext(): Promise<BrowserContext> {
   const browser = await getBrowser();
-  return browser.newContext({
+  const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     locale: "ko-KR",
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    javaScriptEnabled: true,
+    permissions: [],
+    extraHTTPHeaders: {
+      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Connection": "keep-alive",
+      "Upgrade-Insecure-Requests": "1",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Cache-Control": "max-age=0",
+    },
   });
+
+  // Enhanced stealth scripts to avoid bot detection
+  await context.addInitScript(() => {
+    // 1. Override navigator.webdriver
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
+
+    // 2. Mock plugins (more realistic)
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => ({
+        length: 3,
+        0: { name: 'Chrome PDF Plugin' },
+        1: { name: 'Chrome PDF Viewer' },
+        2: { name: 'Native Client' },
+      }),
+    });
+
+    // 3. Mock languages
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['ko-KR', 'ko', 'en-US', 'en'],
+    });
+
+    // 4. Chrome runtime
+    (window as any).chrome = {
+      runtime: {},
+      loadTimes: function() {},
+      csi: function() {},
+      app: {},
+    };
+
+    // 5. Permissions
+    const originalQuery = (window.navigator.permissions as any).query;
+    (window.navigator.permissions as any).query = (parameters: any) => (
+      parameters.name === 'notifications' ?
+        Promise.resolve({ state: 'denied' }) :
+        originalQuery(parameters)
+    );
+
+    // 6. Override canvas fingerprinting
+    const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function(type?: string) {
+      const context = this.getContext('2d');
+      if (context) {
+        const imageData = context.getImageData(0, 0, this.width, this.height);
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          imageData.data[i] += Math.random() < 0.1 ? 1 : 0;
+        }
+        context.putImageData(imageData, 0, 0);
+      }
+      return originalToDataURL.apply(this, [type]);
+    };
+
+    // 7. WebGL vendor and renderer
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+      if (parameter === 37445) return 'Intel Inc.';
+      if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+      return getParameter.call(this, parameter);
+    };
+
+    // 8. Mock hardwareConcurrency
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+      get: () => 8,
+    });
+
+    // 9. Mock deviceMemory
+    Object.defineProperty(navigator, 'deviceMemory', {
+      get: () => 8,
+    });
+
+    // 10. Mock platform
+    Object.defineProperty(navigator, 'platform', {
+      get: () => 'Win32',
+    });
+
+    // 11. Mock vendor
+    Object.defineProperty(navigator, 'vendor', {
+      get: () => 'Google Inc.',
+    });
+
+    // 12. Mock connection
+    Object.defineProperty(navigator, 'connection', {
+      get: () => ({
+        effectiveType: '4g',
+        rtt: 100,
+        downlink: 10,
+        saveData: false,
+      }),
+    });
+
+    // 13. Hide automation indicators
+    delete (navigator as any).__proto__.webdriver;
+
+    // 14. Mock battery API
+    Object.defineProperty(navigator, 'getBattery', {
+      value: () => Promise.resolve({
+        charging: true,
+        chargingTime: 0,
+        dischargingTime: Infinity,
+        level: 1,
+      }),
+    });
+  });
+
+  return context;
+}
+
+// Random delay helper
+function randomDelay(min: number, max: number): Promise<void> {
+  const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise(resolve => setTimeout(resolve, delay));
 }
 
 // ============================================================
@@ -59,6 +210,10 @@ function parseNum(s: string | null | undefined): number | null {
   const t = s.replace(/,/g, "").trim();
   const manMatch = t.match(/^([\d.]+)\s*만$/);
   if (manMatch) return Math.round(parseFloat(manMatch[1]) * 10000);
+  const cheonMatch = t.match(/^([\d.]+)\s*천$/);
+  if (cheonMatch) return Math.round(parseFloat(cheonMatch[1]) * 1000);
+  const eokMatch = t.match(/^([\d.]+)\s*억$/);
+  if (eokMatch) return Math.round(parseFloat(eokMatch[1]) * 100000000);
   const kMatch = t.match(/^([\d.]+)\s*[Kk]$/);
   if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
   const mMatch = t.match(/^([\d.]+)\s*[Mm]$/);
@@ -143,10 +298,21 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
 
     // --- Step 1: Profile page → followers (SSR) + wait for API video list ---
     await page.goto(`https://www.tiktok.com/@${username}`, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
       timeout: 30000,
     });
-    await page.waitForTimeout(3000);
+
+    // Shorter delay to speed up (2-3 seconds)
+    await randomDelay(2000, 3000);
+
+    // Wait for network to settle (reduced timeout)
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+
+    // Mimic human mouse movements (faster)
+    await page.mouse.move(100, 100);
+    await randomDelay(200, 400);
+    await page.mouse.move(500, 300);
+    await randomDelay(300, 500);
 
     // Followers from SSR JSON
     const profileData = await page.evaluate(() => {
@@ -198,6 +364,14 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
 
     // --- Step 3: Fallback — try DOM video grid (may fail due to bot detection) ---
     if (result.lastPostView === null) {
+      // Quick human-like scrolling to trigger content loading
+      await page.evaluate(() => window.scrollBy(0, 300));
+      await randomDelay(500, 800);
+      await page.evaluate(() => window.scrollBy(0, 200));
+      await randomDelay(500, 800);
+      await page.evaluate(() => window.scrollBy(0, -300));
+      await randomDelay(500, 800);
+
       const videoInfo = await page.evaluate(() => {
         const items = document.querySelectorAll('[data-e2e="user-post-item"]');
         for (let i = 0; i < items.length; i++) {
@@ -230,8 +404,18 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
           ? videoInfo.href
           : `https://www.tiktok.com${videoInfo.href}`;
 
-        await page.goto(videoUrl, { waitUntil: "networkidle", timeout: 30000 });
-        await page.waitForTimeout(2000);
+        // Shorter delay before navigating to video
+        await randomDelay(1500, 2500);
+
+        await page.goto(videoUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 30000
+        });
+        await randomDelay(1500, 2500);
+
+        // Additional human-like behavior on video page
+        await page.mouse.move(300, 400);
+        await randomDelay(300, 500);
 
         const videoStats = await page.evaluate(() => {
           const scriptEl = document.querySelector(
@@ -275,13 +459,102 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
     if (result.lastPostView === null) {
       console.warn(`[TikTok] Could not fetch video data for @${username} — bot detection likely active`);
     }
+
+    return result;
   } catch (e) {
     console.error(`[TikTok] Error scraping @${username}:`, e);
+    throw e;
   } finally {
     await context.close();
   }
+}
 
-  return result;
+// TikTok scraper with retry logic (exported for API use)
+export async function scrapeTikTokWithRetry(username: string, maxRetries = 5): Promise<ScrapeResult> {
+  let bestResult: ScrapeResult = emptyResult("tiktok", username);
+  let bestScore = 0;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[TikTok] 🔄 Attempt ${attempt}/${maxRetries} for @${username}`);
+
+      const result = await scrapeTikTok(username);
+
+      // Count what we got
+      const fields = {
+        followers: result.followers !== null,
+        date: result.lastPostDate !== null,
+        view: result.lastPostView !== null,
+        like: result.lastPostLike !== null,
+        save: result.lastPostSave !== null
+      };
+      const currentScore = Object.values(fields).filter(Boolean).length;
+
+      // Log what we found
+      const gotFields = Object.entries(fields).filter(([_, v]) => v).map(([k]) => k).join(', ');
+      console.log(`[TikTok] 📊 Got: ${gotFields || 'nothing'} (${currentScore}/5 fields)`);
+
+      // Keep track of best result so far
+      if (currentScore > bestScore) {
+        bestResult = result;
+        bestScore = currentScore;
+        console.log(`[TikTok] 🎯 New best score: ${bestScore}/5`);
+      }
+
+      // SUCCESS: Got all 5 fields (followers + 4 video fields)
+      if (currentScore === 5) {
+        console.log(`[TikTok] ✅ Perfect! Got all data for @${username} on attempt ${attempt}`);
+        return result;
+      }
+
+      // GOOD ENOUGH: Got followers + at least 3/4 video fields
+      const videoDataCount = [fields.date, fields.view, fields.like, fields.save].filter(Boolean).length;
+      if (result.followers !== null && videoDataCount >= 3) {
+        console.log(`[TikTok] ✅ Good enough! Got followers + ${videoDataCount}/4 video fields`);
+        return result;
+      }
+
+      // If not last attempt, retry
+      if (attempt < maxRetries) {
+        if (result.followers === null) {
+          console.warn(`[TikTok] ⚠️ Missing followers (${currentScore}/5), retrying...`);
+        } else if (videoDataCount === 0) {
+          console.warn(`[TikTok] ⚠️ No video data (${currentScore}/5), retrying...`);
+        } else {
+          console.warn(`[TikTok] ⚠️ Incomplete (${currentScore}/5), need at least followers + 3 video fields, retrying...`);
+        }
+
+        // Progressive backoff: 2-4s, 4-7s, 6-10s, 8-13s, 10-16s
+        const baseDelay = (attempt + 1) * 2000;
+        const randomExtra = Math.floor(Math.random() * 3000);
+        const totalDelay = baseDelay + randomExtra;
+        console.log(`[TikTok] ⏳ Waiting ${(totalDelay / 1000).toFixed(1)}s before retry...`);
+        await new Promise(r => setTimeout(r, totalDelay));
+      } else {
+        // Last attempt - return best result we got
+        console.warn(`[TikTok] ⚠️ Max retries reached. Returning best result: ${bestScore}/5 fields`);
+        return bestResult;
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error(`[TikTok] ❌ Error on attempt ${attempt}/${maxRetries} for @${username}: ${errMsg}`);
+
+      if (attempt < maxRetries) {
+        const baseDelay = (attempt + 1) * 2000;
+        const randomExtra = Math.floor(Math.random() * 3000);
+        await new Promise(r => setTimeout(r, baseDelay + randomExtra));
+      }
+    }
+  }
+
+  // All retries failed - return best result we managed to get
+  if (bestScore > 0) {
+    console.error(`[TikTok] ⛔ All ${maxRetries} attempts completed. Best result: ${bestScore}/5 fields`);
+    return bestResult;
+  }
+
+  console.error(`[TikTok] ⛔ All ${maxRetries} attempts failed for @${username} - got nothing`);
+  return emptyResult("tiktok", username);
 }
 
 // ============================================================
@@ -441,34 +714,37 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
         }
       }
 
-      // First Short link + views from the grid
-      const shortLinks = document.querySelectorAll('a[href*="/shorts/"]');
-      for (const link of shortLinks) {
-        const href = link.getAttribute("href");
-        if (!href || !href.includes("/shorts/")) continue;
-        firstShortHref = href;
+      // First Short: use ytm-shorts-lockup-view-model which contains
+      // the title + "조회수 59회" text matching what users see on the channel page.
+      const lockupModels = document.querySelectorAll("ytm-shorts-lockup-view-model");
+      if (lockupModels.length > 0) {
+        const firstModel = lockupModels[0];
+        // Get the link href from within the model
+        const linkEl = firstModel.querySelector('a[href*="/shorts/"]');
+        if (linkEl) {
+          const href = linkEl.getAttribute("href");
+          if (href && /\/shorts\/[A-Za-z0-9_-]{5,}/.test(href)) {
+            firstShortHref = href;
+          }
+        }
+        // View count: text contains "조회수 59회" or "조회수 1.2만회"
+        const fullText = firstModel.textContent || "";
+        const viewMatch = fullText.match(/조회수\s*([\d,.만천억KkMm]+)\s*회?/);
+        if (viewMatch) {
+          firstShortViews = viewMatch[1];
+        }
+      }
 
-        // Views are typically in a span within the short card
-        const viewSpans = link.querySelectorAll("span");
-        for (const span of viewSpans) {
-          const text = span.textContent?.trim() || "";
-          if (
-            (text.includes("조회수") || text.includes("회") ||
-             text.toLowerCase().includes("view")) &&
-            /\d/.test(text) && text.length < 50
-          ) {
-            firstShortViews = text;
-            break;
-          }
+      // Fallback: scan a[href] links if lockup model didn't work
+      if (!firstShortHref) {
+        const shortLinks = document.querySelectorAll('a[href*="/shorts/"]');
+        for (const link of shortLinks) {
+          const href = link.getAttribute("href");
+          if (!href) continue;
+          if (!/\/shorts\/[A-Za-z0-9_-]{5,}/.test(href)) continue;
+          firstShortHref = href;
+          break;
         }
-        // Also check aria-label on the link itself (e.g. "조회수 1.2만회")
-        if (!firstShortViews) {
-          const ariaLabel = link.getAttribute("aria-label") || "";
-          if (/\d/.test(ariaLabel) && (ariaLabel.includes("조회") || ariaLabel.toLowerCase().includes("view"))) {
-            firstShortViews = ariaLabel;
-          }
-        }
-        break; // only first short
       }
 
       return { subscribers, firstShortHref, firstShortViews };
@@ -497,60 +773,62 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
         let dateStr: string | null = null;
         let views: string | null = null;
 
-        // Like count: button with aria-label containing "좋아요" or "like"
-        const buttons = document.querySelectorAll("button");
-        for (const btn of buttons) {
-          const ariaLabel = btn.getAttribute("aria-label") || "";
-          if (
-            (ariaLabel.includes("좋아요") || ariaLabel.toLowerCase().includes("like")) &&
-            /\d/.test(ariaLabel)
-          ) {
-            const m = ariaLabel.match(/([\d,.만KkMm]+)/);
-            if (m) likes = m[1];
-            break;
-          }
-          // Fallback: button text with just a number near a like icon
-          const text = btn.textContent?.trim() || "";
-          if (/^\d[\d,.KkMm만]*$/.test(text) && text.length < 20 && !likes) {
-            likes = text;
+        // YouTube Shorts detail page uses <factoid-renderer> elements with structure:
+        //   <span class="ytwFactoidRendererValue">61</span>
+        //   <span class="ytwFactoidRendererLabel">조회수</span>
+        // Three factoids: 좋아요, 조회수, 날짜(전)
+        const factoids = document.querySelectorAll("factoid-renderer");
+        for (const factoid of factoids) {
+          const valueEl = factoid.querySelector(".ytwFactoidRendererValue");
+          const labelEl = factoid.querySelector(".ytwFactoidRendererLabel");
+          if (!valueEl || !labelEl) continue;
+
+          const value = valueEl.textContent?.trim() || "";
+          const label = labelEl.textContent?.trim() || "";
+
+          if (label === "좋아요" || label.toLowerCase() === "likes") {
+            likes = value;
+          } else if (label === "조회수" || label.toLowerCase().includes("view")) {
+            views = value;
+          } else if (label === "전" || label.toLowerCase() === "ago") {
+            // value is like "8시간", "1일", "3주" — combine with label "전"
+            dateStr = value + label;
           }
         }
 
-        // Also check like count from yt-formatted-string inside like button
+        // Fallback: button aria-label for likes
         if (!likes) {
-          const likeBtn = document.querySelector('#like-button button, [aria-label*="좋아요"], [aria-label*="like" i]');
-          if (likeBtn) {
-            const formatted = likeBtn.querySelector("yt-formatted-string, span");
-            const text = formatted?.textContent?.trim() || "";
-            if (/\d/.test(text) && text.length < 20) likes = text;
+          const buttons = document.querySelectorAll("button");
+          for (const btn of buttons) {
+            const ariaLabel = btn.getAttribute("aria-label") || "";
+            if (
+              (ariaLabel.includes("좋아요") || ariaLabel.toLowerCase().includes("like")) &&
+              /\d/.test(ariaLabel)
+            ) {
+              const m = ariaLabel.match(/([\d,.]+(?:\s*[만천억KkMm])?)\s*명/);
+              if (m) likes = m[1].trim();
+              break;
+            }
           }
         }
 
-        // Date: look for date-related text in description area
-        const allSpans = document.querySelectorAll("span, yt-formatted-string");
-        for (const el of allSpans) {
-          const text = el.textContent?.trim() || "";
-          // Korean date patterns: "2025. 1. 15.", "2025-01-15", "1일 전", "3시간 전"
-          if (/^\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/.test(text) && text.length < 30) {
-            // Normalize "2025. 1. 15." → "2025-1-15"
-            dateStr = text.replace(/\.\s*/g, "-").replace(/-$/, "");
-            break;
-          }
-          if (/\d+\s*(일|시간|분|주|개월)\s*전/.test(text) && text.length < 20) {
-            dateStr = text;
-            break;
-          }
-        }
-
-        // Views from detail page (if we didn't get them from the grid)
-        for (const el of allSpans) {
-          const text = el.textContent?.trim() || "";
-          if (
-            (text.includes("조회수") || text.toLowerCase().includes("view")) &&
-            /\d/.test(text) && text.length < 50
-          ) {
-            views = text;
-            break;
+        // Fallback: parse concatenated factoid text like "2좋아요61조회수7시간전"
+        if (!views || !dateStr) {
+          const allEls = document.querySelectorAll("span, div");
+          for (const el of allEls) {
+            const text = el.textContent?.trim() || "";
+            if (text.length < 10 || text.length > 100) continue;
+            if (text.includes("좋아요") && text.includes("조회수")) {
+              if (!views) {
+                const m = text.match(/(\d[\d,.만천억KkMm]*)\s*조회수/);
+                if (m) views = m[1];
+              }
+              if (!dateStr) {
+                const m = text.match(/(\d+\s*(?:일|시간|분|주|개월)\s*전)\s*$/);
+                if (m) dateStr = m[1];
+              }
+              if (views && dateStr) break;
+            }
           }
         }
 
@@ -585,7 +863,13 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
     const page = await context.newPage();
 
     // --- Step 1: Reels page → followers + first reel views + href ---
-    await page.goto(`https://www.facebook.com/${username}/reels/`, {
+    // Support both username-based and ID-based profiles
+    const isIdBased = /^\d+$/.test(username);
+    const reelsUrl = isIdBased
+      ? `https://www.facebook.com/profile.php?id=${username}&sk=reels`
+      : `https://www.facebook.com/${username}/reels/`;
+
+    await page.goto(reelsUrl, {
       waitUntil: "networkidle",
       timeout: 25000,
     });
@@ -663,10 +947,11 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
         ? reelInfo.href
         : `https://www.facebook.com${reelInfo.href}`;
 
-      await page.goto(reelUrl, { waitUntil: "networkidle", timeout: 25000 });
-      await page.waitForTimeout(3000);
+      // Use domcontentloaded — Facebook reel detail pages never reach networkidle
+      await page.goto(reelUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForTimeout(4000);
 
-      // Close login dialog again if it appears
+      // Close login dialog if it appears (Facebook shows "더 많은 콘텐츠 보기" overlay)
       try {
         const closeBtn = page.locator('div[role="dialog"] button[aria-label="닫기"]');
         if (await closeBtn.isVisible({ timeout: 2000 })) {
@@ -679,19 +964,18 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
         let likes: string | null = null;
         let dateStr: string | null = null;
 
-        // Like count: look for elements near like button or with like-related patterns
-        // Facebook reel pages show "좋아요 N개" or just a number near the like icon
+        // --- Likes ---
+        // Strategy 1: labeled "좋아요 N개"
         const allSpans = document.querySelectorAll("span");
         for (const span of allSpans) {
           const text = span.textContent?.trim() || "";
-          // "좋아요 1.2만개", "좋아요 234개"
           if (text.includes("좋아요") && /\d/.test(text) && text.length < 30) {
-            const m = text.match(/([\d,.만KkMm]+)/);
+            const m = text.match(/([\d,.만천억KkMm]+)/);
             if (m) { likes = m[1]; break; }
           }
         }
 
-        // Fallback: button/div with aria-label containing like count
+        // Strategy 2: aria-label with like count
         if (!likes) {
           const elements = document.querySelectorAll("[aria-label]");
           for (const el of elements) {
@@ -700,33 +984,51 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
               (label.includes("좋아요") || label.toLowerCase().includes("like")) &&
               /\d/.test(label) && label.length < 50
             ) {
-              const m = label.match(/([\d,.만KkMm]+)/);
+              const m = label.match(/([\d,.만천억KkMm]+)/);
               if (m) { likes = m[1]; break; }
             }
           }
         }
 
-        // Date: look for relative date strings or absolute dates
+        // Strategy 3: Facebook reel pages without login show bare numbers
+        // in the order: likes, comments, shares. The first standalone number
+        // (leaf text node with only digits) that isn't part of a larger text is likes.
+        if (!likes) {
+          // Collect leaf-level spans/divs whose DIRECT text is just a number
+          const leafEls = document.querySelectorAll("span, div");
+          const bareNumbers: string[] = [];
+          for (const el of leafEls) {
+            // Only leaf elements (no child elements with text)
+            if (el.children.length > 0) continue;
+            const text = el.textContent?.trim() || "";
+            if (/^[\d,.만천억KkMm]+$/.test(text) && text.length > 0 && text.length < 15) {
+              bareNumbers.push(text);
+            }
+          }
+          // First bare number is likes (Facebook order: likes, comments, shares)
+          if (bareNumbers.length > 0) {
+            likes = bareNumbers[0];
+          }
+        }
+
+        // --- Date ---
         for (const span of allSpans) {
           const text = span.textContent?.trim() || "";
-          // Relative: "1일 전", "3시간 전", "2주 전"
           if (/^\d+\s*(일|시간|분|주|개월)\s*전$/.test(text)) {
             dateStr = text;
             break;
           }
-          // Absolute: "2025년 1월 15일", "1월 15일"
           if (/\d{4}년\s*\d{1,2}월\s*\d{1,2}일/.test(text) && text.length < 30) {
             const m = text.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
             if (m) { dateStr = `${m[1]}-${m[2]}-${m[3]}`; break; }
           }
-          // "January 15, 2025" or similar English date
           if (/\d{1,2},?\s*\d{4}/.test(text) && text.length < 30 && text.length > 5) {
             dateStr = text;
             break;
           }
         }
 
-        // Fallback: <abbr> or elements with datetime attribute
+        // Fallback: elements with datetime/timestamp attributes
         if (!dateStr) {
           const timeEls = document.querySelectorAll("abbr[data-utime], time[datetime], [data-timestamp]");
           for (const el of timeEls) {
@@ -734,7 +1036,6 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
             if (dt) {
               const timestamp = Number(dt);
               if (!isNaN(timestamp) && timestamp > 1000000000) {
-                // Unix timestamp (seconds)
                 dateStr = new Date(timestamp * 1000).toISOString().split("T")[0];
                 break;
               }
