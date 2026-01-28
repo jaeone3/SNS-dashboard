@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===== Region (Country) =====
+model Region {
+  code        String   @id // "KR", "US", "JP"
+  name        String // "Korea"
+  flagEmoji   String // "🇰🇷"
+  createdAt   DateTime @default(now())
+
+  // Many-to-many: Region <-> Language
+  languages   RegionLanguage[]
+  accounts    Account[]
+}
+
+// ===== Language (Tab) =====
+model Language {
+  id          String   @id @default(uuid())
+  code        String   @unique // "EN", "JP", "SP", "CN"
+  label       String // "English"
+  countryCode String // ISO country code for flag — "US", "JP", "ES", "CN"
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  // Many-to-many: Region <-> Language
+  regions     RegionLanguage[]
+  accounts    Account[]
+}
+
+// ===== Region-Language join table =====
+model RegionLanguage {
+  regionCode String
+  languageId String
+
+  region     Region   @relation(fields: [regionCode], references: [code], onDelete: Cascade)
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@id([regionCode, languageId])
+}
+
+// ===== Platform =====
+model Platform {
+  id                 String   @id @default(uuid())
+  name               String   @unique // "tiktok" (lowercase, unique key)
+  displayName        String // "TikTok"
+  iconName           String // lucide-react icon name or custom identifier
+  profileUrlTemplate String // e.g. "https://www.tiktok.com/@{username}"
+  createdAt          DateTime @default(now())
+
+  accounts           Account[]
+}
+
+// ===== Tag (ETC column) =====
+model Tag {
+  id        String   @id @default(uuid())
+  label     String   @unique // "#Shadowban"
+  color     String // hex "#ef4444"
+  createdAt DateTime @default(now())
+
+  // Many-to-many: Account <-> Tag
+  accounts  AccountTag[]
+}
+
+// ===== SNS Account (main entity) =====
+model Account {
+  id           String   @id @default(uuid())
+  platformId   String
+  username     String
+  regionCode   String
+  languageCode String // stores Language.code
+
+  // Latest post metrics
+  followers    Int?
+  lastPostDate String? // "YYYY-MM-DD"
+  lastPostView Int?
+  lastPostLike Int?
+  lastPostSave Int?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  platform     Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  region       Region   @relation(fields: [regionCode], references: [code], onDelete: Cascade)
+  language     Language @relation(fields: [languageCode], references: [code], onDelete: Cascade)
+
+  // Many-to-many: Account <-> Tag
+  tags         AccountTag[]
+
+  @@unique([platformId, username]) // same username can't exist twice on same platform
+}
+
+// ===== Account-Tag join table =====
+model AccountTag {
+  accountId String
+  tagId     String
+
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, tagId])
+}

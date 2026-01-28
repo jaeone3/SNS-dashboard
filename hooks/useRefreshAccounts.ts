@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
 import type { ScrapeResult } from "@/app/api/scrape/route";
 
-const SHADOWBAN_TAG_ID = "tag-shadowban";
+const SHADOWBAN_TAG_LABEL = "#Shadowban";
 const SHADOWBAN_RECHECK_DELAY = 10 * 60 * 1000; // 10 minutes
 
 export function useRefreshAccounts() {
@@ -14,6 +14,7 @@ export function useRefreshAccounts() {
   );
   const accounts = useDashboardStore((s) => s.accounts);
   const platforms = useDashboardStore((s) => s.platforms);
+  const tags = useDashboardStore((s) => s.tags);
   const updateAccount = useDashboardStore((s) => s.updateAccount);
   const assignTag = useDashboardStore((s) => s.assignTag);
   const getFilteredAccounts = useDashboardStore((s) => s.getFilteredAccounts);
@@ -89,7 +90,10 @@ export function useRefreshAccounts() {
             applyScrapeResult(accountId, data);
             // If lastPostView is still exactly 0, assign shadowban tag
             if (data.lastPostView === 0) {
-              assignTag(accountId, SHADOWBAN_TAG_ID);
+              const shadowbanTag = tags.find((t) => t.label === SHADOWBAN_TAG_LABEL);
+              if (shadowbanTag) {
+                assignTag(accountId, shadowbanTag.id);
+              }
             }
           }
         } catch {
@@ -110,7 +114,7 @@ export function useRefreshAccounts() {
 
       shadowbanTimers.current.set(accountId, timer);
     },
-    [scrapeAccount, applyScrapeResult, assignTag]
+    [scrapeAccount, applyScrapeResult, assignTag, tags]
   );
 
   const refreshOne = useCallback(

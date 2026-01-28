@@ -7,23 +7,29 @@ import { LanguageTabs } from "@/components/dashboard/LanguageTabs";
 import { AccountTable } from "@/components/dashboard/AccountTable";
 import { ManageSheet } from "@/components/manage/ManageSheet";
 import { useRefreshAccounts } from "@/hooks/useRefreshAccounts";
-import { RefreshCw } from "lucide-react";
+import { useDashboardStore } from "@/stores/dashboard-store";
+import { RefreshCw, Loader2 } from "lucide-react";
 
 export default function Home() {
   const [manageOpen, setManageOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
   const { refreshOne, refreshAll, refreshingIds, isRefreshing, shadowbanCheckingIds } =
     useRefreshAccounts();
+  const isLoading = useDashboardStore((s) => s.isLoading);
+  const fetchAll = useDashboardStore((s) => s.fetchAll);
 
   useEffect(() => {
-    setHydrated(true);
-  }, []);
+    fetchAll();
+  }, [fetchAll]);
 
-  if (!hydrated) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
         <main className="mx-auto max-w-[1400px] px-8 py-10">
           <DashboardHeader />
+          <div className="mt-20 flex flex-col items-center justify-center gap-3 text-neutral-400">
+            <Loader2 size={24} className="animate-spin" />
+            <p className="text-sm">Loading data…</p>
+          </div>
         </main>
       </div>
     );
