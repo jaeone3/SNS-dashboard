@@ -11,14 +11,30 @@ export async function POST(request: Request) {
       languageCode: string;
     };
 
-    if (!platformId || !username || !regionCode || !languageCode) {
-      return NextResponse.json(
-        { error: "platformId, username, regionCode, and languageCode are required" },
-        { status: 400 }
-      );
-    }
+     if (!platformId || !username || !regionCode || !languageCode) {
+       return NextResponse.json(
+         { error: "platformId, username, regionCode, and languageCode are required" },
+         { status: 400 }
+       );
+     }
 
-    const account = await prisma.account.create({
+     const [platformExists, regionExists, languageExists] = await Promise.all([
+       prisma.platform.findUnique({ where: { id: platformId }, select: { id: true } }),
+       prisma.region.findUnique({ where: { code: regionCode }, select: { code: true } }),
+       prisma.language.findUnique({ where: { code: languageCode }, select: { code: true } }),
+     ]);
+
+     if (!platformExists) {
+       return NextResponse.json({ error: "Platform not found" }, { status: 400 });
+     }
+     if (!regionExists) {
+       return NextResponse.json({ error: "Region not found" }, { status: 400 });
+     }
+     if (!languageExists) {
+       return NextResponse.json({ error: "Language not found" }, { status: 400 });
+     }
+
+     const account = await prisma.account.create({
       data: {
         ...(body.id ? { id: body.id } : {}),
         platformId,

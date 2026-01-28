@@ -1,6 +1,17 @@
 import { create } from "zustand";
 import type { Region, Language, Platform, Tag, Account } from "@/types";
 import { generateId, nowISO } from "@/lib/utils";
+import { toast } from "@/stores/toast-store";
+
+/** Helper: fetch + parse error on non-ok response */
+async function apiFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Server error: ${res.status}`);
+  }
+  return res;
+}
 
 interface DashboardState {
   // --- Data ---
@@ -24,35 +35,35 @@ interface DashboardState {
   fetchAll: () => Promise<void>;
 
   // --- Region ---
-  addRegion: (region: Region) => void;
-  removeRegion: (code: string) => void;
-  assignLanguageToRegion: (regionCode: string, languageId: string) => void;
-  unassignLanguageFromRegion: (regionCode: string, languageId: string) => void;
+  addRegion: (region: Region) => Promise<void>;
+  removeRegion: (code: string) => Promise<void>;
+  assignLanguageToRegion: (regionCode: string, languageId: string) => Promise<void>;
+  unassignLanguageFromRegion: (regionCode: string, languageId: string) => Promise<void>;
 
   // --- Language ---
-  addLanguage: (lang: Omit<Language, "id">) => void;
-  removeLanguage: (id: string) => void;
+  addLanguage: (lang: Omit<Language, "id">) => Promise<void>;
+  removeLanguage: (id: string) => Promise<void>;
   reorderLanguages: (ids: string[]) => void;
 
   // --- Platform ---
-  addPlatform: (platform: Omit<Platform, "id">) => void;
-  removePlatform: (id: string) => void;
+  addPlatform: (platform: Omit<Platform, "id">) => Promise<void>;
+  removePlatform: (id: string) => Promise<void>;
 
   // --- Tag ---
-  addTag: (tag: Omit<Tag, "id">) => void;
-  updateTag: (id: string, data: Partial<Tag>) => void;
-  removeTag: (id: string) => void;
+  addTag: (tag: Omit<Tag, "id">) => Promise<void>;
+  updateTag: (id: string, data: Partial<Tag>) => Promise<void>;
+  removeTag: (id: string) => Promise<void>;
 
   // --- Account ---
   addAccount: (
     account: Omit<Account, "id" | "createdAt" | "updatedAt">
-  ) => void;
-  updateAccount: (id: string, data: Partial<Account>) => void;
-  removeAccount: (id: string) => void;
+  ) => Promise<void>;
+  updateAccount: (id: string, data: Partial<Account>) => Promise<void>;
+  removeAccount: (id: string) => Promise<void>;
 
   // --- Account Tags ---
-  assignTag: (accountId: string, tagId: string) => void;
-  unassignTag: (accountId: string, tagId: string) => void;
+  assignTag: (accountId: string, tagId: string) => Promise<void>;
+  unassignTag: (accountId: string, tagId: string) => Promise<void>;
 
   // --- Filters ---
   setRegion: (code: string) => void;
@@ -108,18 +119,23 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
   },
 
   // ========== Region ==========
-  addRegion: (region) => {
-    set((state) => ({
-      regions: [...state.regions, region],
-    }));
-    fetch("/api/regions", {
+  addRegion: async (region) => {
+    await apiFetch("/api/regions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(region),
-    }).catch((e) => console.error("addRegion sync error:", e));
+    });
+    set((state) => ({
+      regions: [...state.regions, region],
+    }));
   },
 
-  removeRegion: (code) => {
+  removeRegion: async (code) => {
+    await apiFetch("/api/regions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
     set((state) => ({
       regions: state.regions.filter((r) => r.code !== code),
       accounts: state.accounts.filter((a) => a.regionCode !== code),
@@ -128,14 +144,14 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
           ? state.regions.find((r) => r.code !== code)?.code ?? ""
           : state.selectedRegion,
     }));
-    fetch("/api/regions", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    }).catch((e) => console.error("removeRegion sync error:", e));
   },
 
-  assignLanguageToRegion: (regionCode, languageId) => {
+  assignLanguageToRegion: async (regionCode, languageId) => {
+    await apiFetch(`/api/regions/${regionCode}/languages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ languageId }),
+    });
     set((state) => ({
       regions: state.regions.map((r) =>
         r.code === regionCode && !r.languageIds.includes(languageId)
@@ -143,14 +159,14 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
           : r
       ),
     }));
-    fetch(`/api/regions/${regionCode}/languages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ languageId }),
-    }).catch((e) => console.error("assignLanguageToRegion sync error:", e));
   },
 
-  unassignLanguageFromRegion: (regionCode, languageId) => {
+  unassignLanguageFromRegion: async (regionCode, languageId) => {
+    await apiFetch(`/api/regions/${regionCode}/languages`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ languageId }),
+    });
     set((state) => {
       const lang = state.languages.find((l) => l.id === languageId);
       return {
@@ -184,53 +200,45 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
             : state.selectedLanguage,
       };
     });
-    fetch(`/api/regions/${regionCode}/languages`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ languageId }),
-    }).catch((e) => console.error("unassignLanguageFromRegion sync error:", e));
   },
 
   // ========== Language ==========
-  addLanguage: (lang) => {
+  addLanguage: async (lang) => {
     const newId = generateId();
     const newLang = { ...lang, id: newId, sortOrder: get().languages.length };
-    set((state) => ({
-      languages: [...state.languages, newLang],
-    }));
-    fetch("/api/languages", {
+    await apiFetch("/api/languages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newLang),
-    }).catch((e) => console.error("addLanguage sync error:", e));
-    return newId;
+    });
+    set((state) => ({
+      languages: [...state.languages, newLang],
+    }));
   },
 
-  removeLanguage: (id) => {
+  removeLanguage: async (id) => {
     const lang = get().languages.find((l) => l.id === id);
-    set((state) => {
-      return {
-        languages: state.languages.filter((l) => l.id !== id),
-        // Remove language from all regions
-        regions: state.regions.map((r) => ({
-          ...r,
-          languageIds: r.languageIds.filter((lid) => lid !== id),
-        })),
-        // Remove accounts with this language
-        accounts: lang
-          ? state.accounts.filter((a) => a.languageCode !== lang.code)
-          : state.accounts,
-        selectedLanguage:
-          lang && state.selectedLanguage === lang.code
-            ? state.languages.find((l) => l.id !== id)?.code ?? ""
-            : state.selectedLanguage,
-      };
-    });
-    fetch("/api/languages", {
+    await apiFetch("/api/languages", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    }).catch((e) => console.error("removeLanguage sync error:", e));
+    });
+    set((state) => ({
+      languages: state.languages.filter((l) => l.id !== id),
+      // Remove language from all regions
+      regions: state.regions.map((r) => ({
+        ...r,
+        languageIds: r.languageIds.filter((lid) => lid !== id),
+      })),
+      // Remove accounts with this language
+      accounts: lang
+        ? state.accounts.filter((a) => a.languageCode !== lang.code)
+        : state.accounts,
+      selectedLanguage:
+        lang && state.selectedLanguage === lang.code
+          ? state.languages.find((l) => l.id !== id)?.code ?? ""
+          : state.selectedLanguage,
+    }));
   },
 
   reorderLanguages: (ids) =>
@@ -244,57 +252,62 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
     })),
 
   // ========== Platform ==========
-  addPlatform: (platform) => {
+  addPlatform: async (platform) => {
     const newPlatform = { ...platform, id: generateId() };
-    set((state) => ({
-      platforms: [...state.platforms, newPlatform],
-    }));
-    fetch("/api/platforms", {
+    await apiFetch("/api/platforms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPlatform),
-    }).catch((e) => console.error("addPlatform sync error:", e));
+    });
+    set((state) => ({
+      platforms: [...state.platforms, newPlatform],
+    }));
   },
 
-  removePlatform: (id) => {
+  removePlatform: async (id) => {
+    await apiFetch("/api/platforms", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
     set((state) => ({
       platforms: state.platforms.filter((p) => p.id !== id),
       accounts: state.accounts.filter((a) => a.platformId !== id),
     }));
-    fetch("/api/platforms", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    }).catch((e) => console.error("removePlatform sync error:", e));
   },
 
   // ========== Tag ==========
-  addTag: (tag) => {
+  addTag: async (tag) => {
     const newTag = { ...tag, id: generateId() };
-    set((state) => ({
-      tags: [...state.tags, newTag],
-    }));
-    fetch("/api/tags", {
+    await apiFetch("/api/tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTag),
-    }).catch((e) => console.error("addTag sync error:", e));
+    });
+    set((state) => ({
+      tags: [...state.tags, newTag],
+    }));
   },
 
-  updateTag: (id, data) => {
+  updateTag: async (id, data) => {
+    await apiFetch("/api/tags", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...data }),
+    });
     set((state) => ({
       tags: state.tags.map((t) =>
         t.id === id ? { ...t, ...data } : t
       ),
     }));
-    fetch("/api/tags", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...data }),
-    }).catch((e) => console.error("updateTag sync error:", e));
   },
 
-  removeTag: (id) => {
+  removeTag: async (id) => {
+    await apiFetch("/api/tags", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
     set((state) => ({
       tags: state.tags.filter((t) => t.id !== id),
       accounts: state.accounts.map((a) => ({
@@ -302,58 +315,58 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
         tagIds: a.tagIds.filter((tid) => tid !== id),
       })),
     }));
-    fetch("/api/tags", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    }).catch((e) => console.error("removeTag sync error:", e));
   },
 
   // ========== Account ==========
-  addAccount: (account) => {
+  addAccount: async (account) => {
     const newAccount = {
       ...account,
       id: generateId(),
       createdAt: nowISO(),
       updatedAt: nowISO(),
     };
-    set((state) => ({
-      accounts: [...state.accounts, newAccount],
-    }));
-    fetch("/api/accounts", {
+    await apiFetch("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAccount),
-    }).catch((e) => console.error("addAccount sync error:", e));
+    });
+    set((state) => ({
+      accounts: [...state.accounts, newAccount],
+    }));
   },
 
-  updateAccount: (id, data) => {
+  updateAccount: async (id, data) => {
     const updatedData = { ...data, updatedAt: nowISO() };
+    await apiFetch("/api/accounts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...updatedData }),
+    });
     set((state) => ({
       accounts: state.accounts.map((a) =>
         a.id === id ? { ...a, ...updatedData } : a
       ),
     }));
-    fetch("/api/accounts", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...updatedData }),
-    }).catch((e) => console.error("updateAccount sync error:", e));
   },
 
-  removeAccount: (id) => {
-    set((state) => ({
-      accounts: state.accounts.filter((a) => a.id !== id),
-    }));
-    fetch("/api/accounts", {
+  removeAccount: async (id) => {
+    await apiFetch("/api/accounts", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    }).catch((e) => console.error("removeAccount sync error:", e));
+    });
+    set((state) => ({
+      accounts: state.accounts.filter((a) => a.id !== id),
+    }));
   },
 
   // ========== Account Tags ==========
-  assignTag: (accountId, tagId) => {
+  assignTag: async (accountId, tagId) => {
+    await apiFetch(`/api/accounts/${accountId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
     set((state) => ({
       accounts: state.accounts.map((a) =>
         a.id === accountId && !a.tagIds.includes(tagId)
@@ -361,14 +374,14 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
           : a
       ),
     }));
-    fetch(`/api/accounts/${accountId}/tags`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagId }),
-    }).catch((e) => console.error("assignTag sync error:", e));
   },
 
-  unassignTag: (accountId, tagId) => {
+  unassignTag: async (accountId, tagId) => {
+    await apiFetch(`/api/accounts/${accountId}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
     set((state) => ({
       accounts: state.accounts.map((a) =>
         a.id === accountId
@@ -380,11 +393,6 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
           : a
       ),
     }));
-    fetch(`/api/accounts/${accountId}/tags`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagId }),
-    }).catch((e) => console.error("unassignTag sync error:", e));
   },
 
   // ========== Filters ==========

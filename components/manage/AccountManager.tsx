@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +51,10 @@ export const AccountManager = () => {
   // Scraping state
   const [scraping, setScraping] = useState(false);
   const [scraped, setScraped] = useState<ScrapeResult | null>(null);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+
+  // Saving state
+  const [saving, setSaving] = useState(false);
 
   const currentRegion = regions.find((r) => r.code === selectedRegion);
 
@@ -61,6 +66,7 @@ export const AccountManager = () => {
     setLinkParsed(false);
     setScraping(false);
     setScraped(null);
+    setScrapeError(null);
   };
 
   // Scrape profile data from API
@@ -68,6 +74,7 @@ export const AccountManager = () => {
     async (platformName: string, user: string) => {
       setScraping(true);
       setScraped(null);
+      setScrapeError(null);
       try {
         const res = await fetch("/api/scrape", {
           method: "POST",
@@ -77,9 +84,14 @@ export const AccountManager = () => {
         if (res.ok) {
           const data: ScrapeResult = await res.json();
           setScraped(data);
+        } else {
+          const errData = await res.json().catch(() => null);
+          setScrapeError(errData?.error ?? `Scraping failed (${res.status})`);
         }
-      } catch {
-        // scraping is best-effort, don't block the flow
+      } catch (err) {
+        setScrapeError(
+          err instanceof Error ? err.message : "Network error during scraping"
+        );
       } finally {
         setScraping(false);
       }
@@ -122,59 +134,68 @@ export const AccountManager = () => {
     [platforms, scrapeProfile]
   );
 
-  const handleAdd = () => {
-    const regionCode = selectedRegion;
-    const languageCode = selectedLanguage;
+   const handleAdd = async () => {
+     const regionCode = selectedRegion;
+     const languageCode = selectedLanguage;
 
-    const result = accountSchema.safeParse({
-      platformId,
-      username,
-      regionCode,
-      languageCode,
-    });
+     const result = accountSchema.safeParse({
+       platformId,
+       username,
+       regionCode,
+       languageCode,
+     });
 
-    if (!result.success) {
-      setError(result.error.issues[0].message);
-      return;
-    }
+     if (!result.success) {
+       setError(result.error.issues[0].message);
+       return;
+     }
 
-    const exists = accounts.some(
-      (a) => a.platformId === platformId && a.username === username
-    );
-    if (exists) {
-      setError("This account already exists.");
-      return;
-    }
+     const exists = accounts.some(
+       (a) => a.platformId === platformId && a.username === username
+     );
+     if (exists) {
+       setError("This account already exists.");
+       return;
+     }
 
-    // Use scraped data if available
-    addAccount({
-      platformId,
-      username,
-      regionCode,
-      languageCode,
-      followers: scraped?.followers ?? null,
-      lastPostDate: scraped?.lastPostDate ?? null,
-      lastPostView: scraped?.lastPostView ?? null,
-      lastPostLike: scraped?.lastPostLike ?? null,
-      lastPostSave: scraped?.lastPostSave ?? null,
-      tagIds: [],
-    });
-
-    resetForm();
-    setDialogOpen(false);
-  };
+     setSaving(true);
+     try {
+       await addAccount({
+         platformId,
+         username,
+         regionCode,
+         languageCode,
+         followers: scraped?.followers ?? null,
+         lastPostDate: scraped?.lastPostDate ?? null,
+         lastPostView: scraped?.lastPostView ?? null,
+         lastPostLike: scraped?.lastPostLike ?? null,
+         lastPostSave: scraped?.lastPostSave ?? null,
+         tagIds: [],
+       });
+       resetForm();
+       setDialogOpen(false);
+     } catch (e) {
+       toast.error(`Failed to add account: ${e instanceof Error ? e.message : "Unknown error"}`);
+     } finally {
+       setSaving(false);
+     }
+   };
 
   const handleDeleteClick = (id: string) => {
     setDeleteId(id);
     setConfirmOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (deleteId) {
-      removeAccount(deleteId);
-      setDeleteId(null);
-    }
-  };
+   const handleConfirmDelete = async () => {
+     if (deleteId) {
+       try {
+         await removeAccount(deleteId);
+       } catch (e) {
+         toast.error(`Failed to delete account: ${e instanceof Error ? e.message : "Unknown error"}`);
+       }
+       setDeleteId(null);
+     }
+   };
 
   const resolvedPlatform = platformId
     ? platforms.find((p) => p.id === platformId)
@@ -331,6 +352,12 @@ export const AccountManager = () => {
                   Fetching profile data...
                 </p>
               )}
+
+              {scrapeError && (
+                <p className="text-xs text-amber-600">
+                  Scraping failed: {scrapeError}. You can still add the account manually.
+                </p>
+              )}
             </div>
 
             <div className="relative flex items-center">
@@ -376,14 +403,14 @@ export const AccountManager = () => {
             {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAdd} disabled={scraping}>
-              {scraping ? "Fetching..." : "Add"}
-            </Button>
-          </DialogFooter>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setDialogOpen(false)}>
+               Cancel
+             </Button>
+             <Button onClick={handleAdd} disabled={scraping || saving}>
+               {scraping ? "Fetching..." : saving ? "Saving..." : "Add"}
+             </Button>
+           </DialogFooter>
         </DialogContent>
       </Dialog>
 

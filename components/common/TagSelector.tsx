@@ -6,6 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import { TagBadge } from "./TagBadge";
 import { Check } from "lucide-react";
 
@@ -24,11 +25,15 @@ export const TagSelector = ({
   const assignTag = useDashboardStore((s) => s.assignTag);
   const unassignTag = useDashboardStore((s) => s.unassignTag);
 
-  const handleToggle = (tagId: string) => {
-    if (assignedTagIds.includes(tagId)) {
-      unassignTag(accountId, tagId);
-    } else {
-      assignTag(accountId, tagId);
+  const handleToggle = async (tagId: string) => {
+    try {
+      if (assignedTagIds.includes(tagId)) {
+        await unassignTag(accountId, tagId);
+      } else {
+        await assignTag(accountId, tagId);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update tag assignment");
     }
   };
 

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import type { ScrapeResult } from "@/app/api/scrape/route";
 
 const SHADOWBAN_TAG_LABEL = "#Shadowban";
@@ -96,8 +97,9 @@ export function useRefreshAccounts() {
               }
             }
           }
-        } catch {
-          // best effort
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          toast.error(`Shadowban re-check failed: ${msg}`);
         } finally {
           setRefreshingIds((prev) => {
             const next = new Set(prev);
@@ -134,9 +136,14 @@ export function useRefreshAccounts() {
           if (data.lastPostView === 0) {
             scheduleShadowbanCheck(accountId);
           }
+        } else {
+          const acct = accounts.find((a) => a.id === accountId);
+          toast.error(`Could not fetch data for ${acct?.username ?? "account"}`);
         }
-      } catch {
-        // best effort
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        const acct = accounts.find((a) => a.id === accountId);
+        toast.error(`Failed to refresh ${acct?.username ?? "account"}: ${msg}`);
       } finally {
         setRefreshingIds((prev) => {
           const next = new Set(prev);

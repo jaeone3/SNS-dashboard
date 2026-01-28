@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +33,7 @@ export const LanguageManager = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
@@ -45,7 +47,7 @@ export const LanguageManager = () => {
     setError("");
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const result = languageSchema.safeParse({ code, label });
     if (!result.success) {
       setError(result.error.issues[0].message);
@@ -58,14 +60,21 @@ export const LanguageManager = () => {
       return;
     }
 
-    addLanguage({
-      code: upperCode,
-      label,
-      countryCode: countryCode.toUpperCase() || upperCode,
-      sortOrder: languages.length,
-    });
-    resetForm();
-    setDialogOpen(false);
+    setSaving(true);
+    try {
+      await addLanguage({
+        code: upperCode,
+        label,
+        countryCode: countryCode.toUpperCase() || upperCode,
+        sortOrder: languages.length,
+      });
+      resetForm();
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add language");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteClick = (id: string) => {
@@ -73,21 +82,29 @@ export const LanguageManager = () => {
     setConfirmOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteId) {
-      removeLanguage(deleteId);
-      setDeleteId(null);
+      try {
+        await removeLanguage(deleteId);
+        setDeleteId(null);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to delete language");
+      }
     }
   };
 
-  const handleToggleRegion = (regionCode: string, languageId: string) => {
+  const handleToggleRegion = async (regionCode: string, languageId: string) => {
     const region = regions.find((r) => r.code === regionCode);
     if (!region) return;
 
-    if (region.languageIds.includes(languageId)) {
-      unassignLanguageFromRegion(regionCode, languageId);
-    } else {
-      assignLanguageToRegion(regionCode, languageId);
+    try {
+      if (region.languageIds.includes(languageId)) {
+        await unassignLanguageFromRegion(regionCode, languageId);
+      } else {
+        await assignLanguageToRegion(regionCode, languageId);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update region assignment");
     }
   };
 
@@ -129,7 +146,7 @@ export const LanguageManager = () => {
               </div>
               <button
                 onClick={() => handleDeleteClick(lang.id)}
-                className="text-neutral-400 hover:text-red-500"
+                className="rounded p-1 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500"
               >
                 <Trash2 size={15} />
               </button>
@@ -190,7 +207,9 @@ export const LanguageManager = () => {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAdd}>Add</Button>
+             <Button onClick={handleAdd} disabled={saving}>
+               {saving ? "Saving..." : "Add"}
+             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

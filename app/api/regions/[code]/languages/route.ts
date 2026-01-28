@@ -10,16 +10,20 @@ export async function POST(
     const body = await request.json();
     const { languageId } = body as { languageId: string };
 
-    if (!languageId) {
-      return NextResponse.json(
-        { error: "languageId is required" },
-        { status: 400 }
-      );
-    }
+     if (!languageId) {
+       return NextResponse.json(
+         { error: "languageId is required" },
+         { status: 400 }
+       );
+     }
 
-    await prisma.regionLanguage.create({
-      data: { regionCode: code, languageId },
-    });
+     await prisma.regionLanguage.upsert({
+       where: {
+         regionCode_languageId: { regionCode: code, languageId },
+       },
+       update: {},
+       create: { regionCode: code, languageId },
+     });
 
     return NextResponse.json({ success: true });
   } catch (error) {

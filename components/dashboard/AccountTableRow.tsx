@@ -6,6 +6,7 @@ import { TagBadge } from "@/components/common/TagBadge";
 import { TagSelector } from "@/components/common/TagSelector";
 import { InlineEditCell } from "./InlineEditCell";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import { ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
 import type { Account } from "@/types";
 
@@ -42,12 +43,19 @@ export const AccountTableRow = ({
   };
   const rowBg = platform ? platformBg[platform.name] ?? undefined : undefined;
 
-  const handleSave = (field: keyof Account, value: number | string | null) => {
-    updateAccount(account.id, { [field]: value });
+  const handleSave = async (field: keyof Account, value: number | string | null) => {
+    try {
+      await updateAccount(account.id, { [field]: value });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update account");
+    }
   };
 
   return (
-    <TableRow style={rowBg ? { backgroundColor: rowBg } : undefined}>
+    <TableRow
+      className="transition-colors hover:bg-neutral-50"
+      style={rowBg ? { backgroundColor: rowBg } : undefined}
+    >
       {/* Platform */}
       <TableCell className="text-center">
         <div className="inline-flex items-center gap-2">

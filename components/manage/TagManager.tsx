@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { toast } from "@/stores/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,6 +36,7 @@ export const TagManager = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [label, setLabel] = useState("#");
   const [color, setColor] = useState(PRESET_COLORS[0]);
@@ -46,7 +48,7 @@ export const TagManager = () => {
     setError("");
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const result = tagSchema.safeParse({ label, color });
     if (!result.success) {
       setError(result.error.issues[0].message);
@@ -58,9 +60,16 @@ export const TagManager = () => {
       return;
     }
 
-    addTag({ label, color });
-    resetForm();
-    setDialogOpen(false);
+    setSaving(true);
+    try {
+      await addTag({ label, color });
+      resetForm();
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add tag");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteClick = (id: string) => {
@@ -68,10 +77,14 @@ export const TagManager = () => {
     setConfirmOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteId) {
-      removeTag(deleteId);
-      setDeleteId(null);
+      try {
+        await removeTag(deleteId);
+        setDeleteId(null);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to delete tag");
+      }
     }
   };
 
@@ -98,7 +111,7 @@ export const TagManager = () => {
             <TagBadge label={tag.label} color={tag.color} />
             <button
               onClick={() => handleDeleteClick(tag.id)}
-              className="text-neutral-400 hover:text-red-500"
+              className="rounded p-1 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 size={15} />
             </button>
@@ -158,7 +171,9 @@ export const TagManager = () => {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAdd}>Add</Button>
+             <Button onClick={handleAdd} disabled={saving}>
+               {saving ? "Saving..." : "Add"}
+             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

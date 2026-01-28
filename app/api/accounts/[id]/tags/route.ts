@@ -10,16 +10,20 @@ export async function POST(
     const body = await request.json();
     const { tagId } = body as { tagId: string };
 
-    if (!tagId) {
-      return NextResponse.json(
-        { error: "tagId is required" },
-        { status: 400 }
-      );
-    }
+     if (!tagId) {
+       return NextResponse.json(
+         { error: "tagId is required" },
+         { status: 400 }
+       );
+     }
 
-    await prisma.accountTag.create({
-      data: { accountId: id, tagId },
-    });
+     await prisma.accountTag.upsert({
+       where: {
+         accountId_tagId: { accountId: id, tagId },
+       },
+       update: {},
+       create: { accountId: id, tagId },
+     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
