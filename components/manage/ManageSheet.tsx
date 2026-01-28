@@ -21,7 +21,7 @@ interface ManageSheetProps {
 export const ManageSheet = ({ open, onOpenChange }: ManageSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[480px] overflow-y-auto sm:max-w-[480px]">
+        <SheetContent className="w-full overflow-y-auto sm:w-[480px] sm:max-w-[480px]">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
           <SheetDescription>

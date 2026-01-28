@@ -14,8 +14,16 @@ export const LanguageTabs = () => {
 
   const sorted = getLanguagesForRegion(selectedRegion);
 
+  if (sorted.length === 0) {
+    return (
+      <p className="text-sm text-neutral-400">
+        No languages assigned. Add from Manage.
+      </p>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {sorted.map((lang) => {
         const isActive = lang.code === selectedLanguage;
         return (

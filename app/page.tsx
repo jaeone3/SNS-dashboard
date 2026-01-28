@@ -8,13 +8,16 @@ import { AccountTable } from "@/components/dashboard/AccountTable";
 import { ManageSheet } from "@/components/manage/ManageSheet";
 import { useRefreshAccounts } from "@/hooks/useRefreshAccounts";
 import { useDashboardStore } from "@/stores/dashboard-store";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { ToastContainer } from "@/components/common/ToastContainer";
+import { RefreshCw, AlertCircle } from "lucide-react";
 
 export default function Home() {
   const [manageOpen, setManageOpen] = useState(false);
   const { refreshOne, refreshAll, refreshingIds, isRefreshing, shadowbanCheckingIds } =
     useRefreshAccounts();
   const isLoading = useDashboardStore((s) => s.isLoading);
+  const error = useDashboardStore((s) => s.error);
   const fetchAll = useDashboardStore((s) => s.fetchAll);
 
   useEffect(() => {
@@ -22,13 +25,23 @@ export default function Home() {
   }, [fetchAll]);
 
   if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
     return (
       <div className="min-h-screen bg-white">
-        <main className="mx-auto max-w-[1400px] px-8 py-10">
+        <main className="mx-auto max-w-[1400px] px-4 sm:px-8 py-6 sm:py-10">
           <DashboardHeader />
-          <div className="mt-20 flex flex-col items-center justify-center gap-3 text-neutral-400">
-            <Loader2 size={24} className="animate-spin" />
-            <p className="text-sm">Loading data…</p>
+          <div className="mt-20 flex flex-col items-center justify-center gap-4 text-neutral-500">
+            <AlertCircle size={28} className="text-red-400" />
+            <p className="text-sm text-red-500">{error}</p>
+            <button
+              onClick={() => fetchAll()}
+              className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+            >
+              Retry
+            </button>
           </div>
         </main>
       </div>
@@ -37,12 +50,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      <main className="mx-auto max-w-[1400px] px-8 py-10">
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-8 py-6 sm:py-10">
         {/* Title */}
         <DashboardHeader />
 
         {/* Learning Language Selector */}
-        <div className="mt-6">
+        <div className="mt-4 sm:mt-6">
           <label className="mb-2 block text-[11px] font-semibold tracking-[0.15em] text-neutral-400 uppercase">
             Learning Language
           </label>
@@ -50,7 +63,7 @@ export default function Home() {
         </div>
 
         {/* Target Language Tabs + Buttons */}
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-4 sm:mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <label className="mb-2 block text-[11px] font-semibold tracking-[0.15em] text-neutral-400 uppercase">
               Target Language
@@ -93,6 +106,9 @@ export default function Home() {
 
       {/* Manage Sheet */}
       <ManageSheet open={manageOpen} onOpenChange={setManageOpen} />
+
+      {/* Toast notifications */}
+      <ToastContainer />
     </div>
   );
 }

@@ -45,8 +45,8 @@ export const AccountTable = ({
   );
 
   return (
-    <div className="w-full">
-      <Table className="w-full">
+    <div className="w-full overflow-x-auto">
+      <Table className="w-full min-w-[900px]">
         <TableHeader>
           <TableRow className="border-t">
             <TableHead className="text-center">
