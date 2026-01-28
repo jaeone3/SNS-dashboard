@@ -158,34 +158,38 @@ export function useRefreshAccounts() {
   const refreshAll = useCallback(async () => {
     const visible = getFilteredAccounts();
 
-    // Split by platform: TikTok needs sequential with delay to avoid bot detection
-    const tiktokPlatform = platforms.find(
-      (p) => p.name.toLowerCase() === "tiktok"
-    );
-    const tiktokAccounts = tiktokPlatform
-      ? visible.filter((a) => a.platformId === tiktokPlatform.id)
-      : [];
-    const otherAccounts = tiktokPlatform
-      ? visible.filter((a) => a.platformId !== tiktokPlatform.id)
-      : visible;
+    // Platforms that need sequential scraping with delay to avoid bot detection
+    const sequentialPlatformNames = ["tiktok", "instagram"];
 
-    // Others run in parallel
-    const othersPromise = Promise.allSettled(
-      otherAccounts.map((a) => refreshOne(a.id))
+    const sequentialPlatforms = platforms.filter((p) =>
+      sequentialPlatformNames.includes(p.name.toLowerCase())
+    );
+    const sequentialPlatformIds = new Set(sequentialPlatforms.map((p) => p.id));
+
+    const sequentialAccounts = visible.filter((a) =>
+      sequentialPlatformIds.has(a.platformId)
+    );
+    const parallelAccounts = visible.filter(
+      (a) => !sequentialPlatformIds.has(a.platformId)
     );
 
-    // TikTok runs sequentially with 3-5s random delay between each
-    const tiktokPromise = (async () => {
-      for (let i = 0; i < tiktokAccounts.length; i++) {
-        await refreshOne(tiktokAccounts[i].id);
-        if (i < tiktokAccounts.length - 1) {
+    // YouTube, Facebook, etc. run in parallel
+    const parallelPromise = Promise.allSettled(
+      parallelAccounts.map((a) => refreshOne(a.id))
+    );
+
+    // TikTok & Instagram run sequentially with 3-5s random delay between each
+    const sequentialPromise = (async () => {
+      for (let i = 0; i < sequentialAccounts.length; i++) {
+        await refreshOne(sequentialAccounts[i].id);
+        if (i < sequentialAccounts.length - 1) {
           const delay = 3000 + Math.random() * 2000; // 3-5 seconds
           await new Promise((r) => setTimeout(r, delay));
         }
       }
     })();
 
-    await Promise.allSettled([othersPromise, tiktokPromise]);
+    await Promise.allSettled([parallelPromise, sequentialPromise]);
   }, [getFilteredAccounts, refreshOne, platforms]);
 
   return {

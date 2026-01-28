@@ -404,7 +404,7 @@ export async function scrapeInstagram(username: string): Promise<ScrapeResult> {
 }
 
 // ============================================================
-// YouTube — Playwright (DOM → subscribers + latest video views)
+// YouTube — Playwright (Shorts tab → subscribers + latest short views/date/like)
 // ============================================================
 export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
   const result = emptyResult("youtube", username);
@@ -412,7 +412,9 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
 
   try {
     const page = await context.newPage();
-    await page.goto(`https://www.youtube.com/@${username}`, {
+
+    // --- Step 1: Shorts tab → subscribers + first short link/views ---
+    await page.goto(`https://www.youtube.com/@${username}/shorts`, {
       waitUntil: "networkidle",
       timeout: 25000,
     });
@@ -420,8 +422,10 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
 
     const channelData = await page.evaluate(() => {
       let subscribers: string | null = null;
-      let latestViews: string | null = null;
+      let firstShortHref: string | null = null;
+      let firstShortViews: string | null = null;
 
+      // Subscribers from channel header
       const spans = document.querySelectorAll("span, yt-formatted-string");
       for (const span of spans) {
         const text = span.textContent?.trim() || "";
@@ -434,28 +438,129 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
         }
       }
 
-      const allEls = document.querySelectorAll("span, yt-formatted-string");
-      for (const el of allEls) {
-        const text = el.textContent?.trim() || "";
-        if (
-          (text.includes("조회수") || text.toLowerCase().includes("view")) &&
-          /\d/.test(text) && text.length < 50
-        ) {
-          latestViews = text;
-          break;
+      // First Short link + views from the grid
+      const shortLinks = document.querySelectorAll('a[href*="/shorts/"]');
+      for (const link of shortLinks) {
+        const href = link.getAttribute("href");
+        if (!href || !href.includes("/shorts/")) continue;
+        firstShortHref = href;
+
+        // Views are typically in a span within the short card
+        const viewSpans = link.querySelectorAll("span");
+        for (const span of viewSpans) {
+          const text = span.textContent?.trim() || "";
+          if (
+            (text.includes("조회수") || text.includes("회") ||
+             text.toLowerCase().includes("view")) &&
+            /\d/.test(text) && text.length < 50
+          ) {
+            firstShortViews = text;
+            break;
+          }
         }
+        // Also check aria-label on the link itself (e.g. "조회수 1.2만회")
+        if (!firstShortViews) {
+          const ariaLabel = link.getAttribute("aria-label") || "";
+          if (/\d/.test(ariaLabel) && (ariaLabel.includes("조회") || ariaLabel.toLowerCase().includes("view"))) {
+            firstShortViews = ariaLabel;
+          }
+        }
+        break; // only first short
       }
 
-      return { subscribers, latestViews };
+      return { subscribers, firstShortHref, firstShortViews };
     });
 
     if (channelData.subscribers) {
       const m = channelData.subscribers.match(/([\d,.만KkMm]+)/);
       if (m) result.followers = parseNum(m[1]);
     }
-    if (channelData.latestViews) {
-      const m = channelData.latestViews.match(/([\d,.만KkMm]+)/);
+    if (channelData.firstShortViews) {
+      const m = channelData.firstShortViews.match(/([\d,.만KkMm]+)/);
       if (m) result.lastPostView = parseNum(m[1]);
+    }
+
+    // --- Step 2: Short detail page → date + like count ---
+    if (channelData.firstShortHref) {
+      const shortUrl = channelData.firstShortHref.startsWith("http")
+        ? channelData.firstShortHref
+        : `https://www.youtube.com${channelData.firstShortHref}`;
+
+      await page.goto(shortUrl, { waitUntil: "networkidle", timeout: 25000 });
+      await page.waitForTimeout(2000);
+
+      const shortStats = await page.evaluate(() => {
+        let likes: string | null = null;
+        let dateStr: string | null = null;
+        let views: string | null = null;
+
+        // Like count: button with aria-label containing "좋아요" or "like"
+        const buttons = document.querySelectorAll("button");
+        for (const btn of buttons) {
+          const ariaLabel = btn.getAttribute("aria-label") || "";
+          if (
+            (ariaLabel.includes("좋아요") || ariaLabel.toLowerCase().includes("like")) &&
+            /\d/.test(ariaLabel)
+          ) {
+            const m = ariaLabel.match(/([\d,.만KkMm]+)/);
+            if (m) likes = m[1];
+            break;
+          }
+          // Fallback: button text with just a number near a like icon
+          const text = btn.textContent?.trim() || "";
+          if (/^\d[\d,.KkMm만]*$/.test(text) && text.length < 20 && !likes) {
+            likes = text;
+          }
+        }
+
+        // Also check like count from yt-formatted-string inside like button
+        if (!likes) {
+          const likeBtn = document.querySelector('#like-button button, [aria-label*="좋아요"], [aria-label*="like" i]');
+          if (likeBtn) {
+            const formatted = likeBtn.querySelector("yt-formatted-string, span");
+            const text = formatted?.textContent?.trim() || "";
+            if (/\d/.test(text) && text.length < 20) likes = text;
+          }
+        }
+
+        // Date: look for date-related text in description area
+        const allSpans = document.querySelectorAll("span, yt-formatted-string");
+        for (const el of allSpans) {
+          const text = el.textContent?.trim() || "";
+          // Korean date patterns: "2025. 1. 15.", "2025-01-15", "1일 전", "3시간 전"
+          if (/^\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/.test(text) && text.length < 30) {
+            // Normalize "2025. 1. 15." → "2025-1-15"
+            dateStr = text.replace(/\.\s*/g, "-").replace(/-$/, "");
+            break;
+          }
+          if (/\d+\s*(일|시간|분|주|개월)\s*전/.test(text) && text.length < 20) {
+            dateStr = text;
+            break;
+          }
+        }
+
+        // Views from detail page (if we didn't get them from the grid)
+        for (const el of allSpans) {
+          const text = el.textContent?.trim() || "";
+          if (
+            (text.includes("조회수") || text.toLowerCase().includes("view")) &&
+            /\d/.test(text) && text.length < 50
+          ) {
+            views = text;
+            break;
+          }
+        }
+
+        return { likes, dateStr, views };
+      });
+
+      if (shortStats.likes) result.lastPostLike = parseNum(shortStats.likes);
+      if (shortStats.dateStr) result.lastPostDate = parseRelativeDate(shortStats.dateStr);
+      // Update views from detail page if grid didn't provide them
+      if (result.lastPostView === null && shortStats.views) {
+        const m = shortStats.views.match(/([\d,.만KkMm]+)/);
+        if (m) result.lastPostView = parseNum(m[1]);
+      }
     }
   } catch (e) {
     console.error(`[YouTube] Error scraping @${username}:`, e);
@@ -467,7 +572,7 @@ export async function scrapeYouTube(username: string): Promise<ScrapeResult> {
 }
 
 // ============================================================
-// Facebook — Playwright (reels tab → followers + first reel views)
+// Facebook — Playwright (reels tab → followers + first reel views/date/like)
 // ============================================================
 export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
   const result = emptyResult("facebook", username);
@@ -476,8 +581,7 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
   try {
     const page = await context.newPage();
 
-    // Try /{username}/reels/ first (works for Pages)
-    // If it fails or shows error, try the profile page with reels_tab
+    // --- Step 1: Reels page → followers + first reel views + href ---
     await page.goto(`https://www.facebook.com/${username}/reels/`, {
       waitUntil: "networkidle",
       timeout: 25000,
@@ -494,8 +598,6 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
     });
 
     if (!pageOk) {
-      // Content unavailable — this username might need profile.php?id= format
-      // Can't auto-resolve ID from username without login, so return empty
       console.warn(`[Facebook] Page unavailable for ${username} via /reels/ URL`);
       await context.close();
       return result;
@@ -510,7 +612,7 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
       }
     } catch { /* */ }
 
-    // Followers: <a> containing "팔로워" with <strong> number
+    // Followers
     const followerData = await page.evaluate(() => {
       const links = document.querySelectorAll("a, span");
       for (const el of links) {
@@ -536,20 +638,116 @@ export async function scrapeFacebook(username: string): Promise<ScrapeResult> {
       result.followers = parseNum(followerData);
     }
 
-    // First reel views from reel cards
-    const reelView = await page.evaluate(() => {
+    // First reel: views + href
+    const reelInfo = await page.evaluate(() => {
       const reelLinks = document.querySelectorAll('a[href*="/reel/"]');
       if (reelLinks.length === 0) return null;
       const firstReel = reelLinks[0];
+      const href = firstReel.getAttribute("href");
       const text = firstReel.textContent?.trim() || "";
-      // The reel card shows just a number (view count)
       const nums = text.match(/(\d[\d,.KkMm만]*)/g);
-      if (nums && nums.length > 0) return nums[nums.length - 1];
-      return null;
+      const views = nums && nums.length > 0 ? nums[nums.length - 1] : null;
+      return { href, views };
     });
 
-    if (reelView) {
-      result.lastPostView = parseNum(reelView);
+    if (reelInfo?.views) {
+      result.lastPostView = parseNum(reelInfo.views);
+    }
+
+    // --- Step 2: Reel detail page → date + like count ---
+    if (reelInfo?.href) {
+      const reelUrl = reelInfo.href.startsWith("http")
+        ? reelInfo.href
+        : `https://www.facebook.com${reelInfo.href}`;
+
+      await page.goto(reelUrl, { waitUntil: "networkidle", timeout: 25000 });
+      await page.waitForTimeout(3000);
+
+      // Close login dialog again if it appears
+      try {
+        const closeBtn = page.locator('div[role="dialog"] button[aria-label="닫기"]');
+        if (await closeBtn.isVisible({ timeout: 2000 })) {
+          await closeBtn.click();
+          await page.waitForTimeout(500);
+        }
+      } catch { /* */ }
+
+      const reelStats = await page.evaluate(() => {
+        let likes: string | null = null;
+        let dateStr: string | null = null;
+
+        // Like count: look for elements near like button or with like-related patterns
+        // Facebook reel pages show "좋아요 N개" or just a number near the like icon
+        const allSpans = document.querySelectorAll("span");
+        for (const span of allSpans) {
+          const text = span.textContent?.trim() || "";
+          // "좋아요 1.2만개", "좋아요 234개"
+          if (text.includes("좋아요") && /\d/.test(text) && text.length < 30) {
+            const m = text.match(/([\d,.만KkMm]+)/);
+            if (m) { likes = m[1]; break; }
+          }
+        }
+
+        // Fallback: button/div with aria-label containing like count
+        if (!likes) {
+          const elements = document.querySelectorAll("[aria-label]");
+          for (const el of elements) {
+            const label = el.getAttribute("aria-label") || "";
+            if (
+              (label.includes("좋아요") || label.toLowerCase().includes("like")) &&
+              /\d/.test(label) && label.length < 50
+            ) {
+              const m = label.match(/([\d,.만KkMm]+)/);
+              if (m) { likes = m[1]; break; }
+            }
+          }
+        }
+
+        // Date: look for relative date strings or absolute dates
+        for (const span of allSpans) {
+          const text = span.textContent?.trim() || "";
+          // Relative: "1일 전", "3시간 전", "2주 전"
+          if (/^\d+\s*(일|시간|분|주|개월)\s*전$/.test(text)) {
+            dateStr = text;
+            break;
+          }
+          // Absolute: "2025년 1월 15일", "1월 15일"
+          if (/\d{4}년\s*\d{1,2}월\s*\d{1,2}일/.test(text) && text.length < 30) {
+            const m = text.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+            if (m) { dateStr = `${m[1]}-${m[2]}-${m[3]}`; break; }
+          }
+          // "January 15, 2025" or similar English date
+          if (/\d{1,2},?\s*\d{4}/.test(text) && text.length < 30 && text.length > 5) {
+            dateStr = text;
+            break;
+          }
+        }
+
+        // Fallback: <abbr> or elements with datetime attribute
+        if (!dateStr) {
+          const timeEls = document.querySelectorAll("abbr[data-utime], time[datetime], [data-timestamp]");
+          for (const el of timeEls) {
+            const dt = el.getAttribute("datetime") || el.getAttribute("data-utime") || el.getAttribute("data-timestamp");
+            if (dt) {
+              const timestamp = Number(dt);
+              if (!isNaN(timestamp) && timestamp > 1000000000) {
+                // Unix timestamp (seconds)
+                dateStr = new Date(timestamp * 1000).toISOString().split("T")[0];
+                break;
+              }
+              if (dt.includes("T") || dt.includes("-")) {
+                dateStr = dt.split("T")[0];
+                break;
+              }
+            }
+          }
+        }
+
+        return { likes, dateStr };
+      });
+
+      if (reelStats.likes) result.lastPostLike = parseNum(reelStats.likes);
+      if (reelStats.dateStr) result.lastPostDate = parseRelativeDate(reelStats.dateStr);
     }
   } catch (e) {
     console.error(`[Facebook] Error scraping ${username}:`, e);
