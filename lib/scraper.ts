@@ -111,7 +111,7 @@ const emptyResult = (platform: string, username: string): ScrapeResult => ({
 });
 
 // ============================================================
-// TikTok — Playwright (profile + video detail)
+// TikTok — Playwright (profile SSR + API intercept for video list)
 // ============================================================
 export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
   const result = emptyResult("tiktok", username);
@@ -120,15 +120,36 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
   try {
     const page = await context.newPage();
 
-    // --- Step 1: Profile page → followers + video list ---
+    // Set up API intercept to capture video list data
+    interface TikTokVideoItem {
+      id: string;
+      createTime: number;
+      isPinnedItem?: boolean;
+      stats?: { playCount?: number; diggCount?: number; collectCount?: number };
+    }
+    let interceptedVideos: TikTokVideoItem[] = [];
+
+    page.on("response", async (response) => {
+      const url = response.url();
+      if (url.includes("/api/post/item_list") && interceptedVideos.length === 0) {
+        try {
+          const json = await response.json();
+          if (json?.itemList?.length > 0) {
+            interceptedVideos = json.itemList;
+          }
+        } catch { /* body may be empty due to bot detection */ }
+      }
+    });
+
+    // --- Step 1: Profile page → followers (SSR) + wait for API video list ---
     await page.goto(`https://www.tiktok.com/@${username}`, {
       waitUntil: "networkidle",
       timeout: 30000,
     });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
+    // Followers from SSR JSON
     const profileData = await page.evaluate(() => {
-      // SSR JSON
       const scriptEl = document.querySelector(
         'script#__UNIVERSAL_DATA_FOR_REHYDRATION__'
       );
@@ -161,113 +182,98 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
           : parseNum(String(profileData.followers));
     }
 
-    // --- Step 2: Find first non-pinned video ---
-    const videoInfo = await page.evaluate(() => {
-      const items = document.querySelectorAll('[data-e2e="user-post-item"]');
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const pinEl =
-          item.querySelector('[data-e2e="video-card-badge"]') ||
-          item.querySelector('svg[class*="pin"]') ||
-          item.querySelector('[class*="PinnedIcon"]');
-        if (pinEl) continue;
-
-        const viewEl = item.querySelector(
-          '[data-e2e="video-views"], strong.video-count'
-        );
-        const linkEl = item.querySelector('a[href*="/video/"]');
-        return {
-          href: linkEl?.getAttribute("href") ?? null,
-          views: viewEl?.textContent?.trim() ?? null,
-        };
+    // --- Step 2: Try to get video data from intercepted API ---
+    if (interceptedVideos.length > 0) {
+      // Find first non-pinned video
+      const video = interceptedVideos.find((v) => !v.isPinnedItem) ?? interceptedVideos[0];
+      if (video) {
+        if (video.createTime) {
+          result.lastPostDate = new Date(video.createTime * 1000).toISOString().split("T")[0];
+        }
+        result.lastPostView = toNum(video.stats?.playCount);
+        result.lastPostLike = toNum(video.stats?.diggCount);
+        result.lastPostSave = toNum(video.stats?.collectCount);
       }
-      return null;
-    });
-
-    if (videoInfo?.views) {
-      result.lastPostView = parseNum(videoInfo.views);
     }
 
-    // --- Step 3: Video detail page → date, like, save ---
-    if (videoInfo?.href) {
-      const videoUrl = videoInfo.href.startsWith("http")
-        ? videoInfo.href
-        : `https://www.tiktok.com${videoInfo.href}`;
+    // --- Step 3: Fallback — try DOM video grid (may fail due to bot detection) ---
+    if (result.lastPostView === null) {
+      const videoInfo = await page.evaluate(() => {
+        const items = document.querySelectorAll('[data-e2e="user-post-item"]');
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const pinEl =
+            item.querySelector('[data-e2e="video-card-badge"]') ||
+            item.querySelector('svg[class*="pin"]') ||
+            item.querySelector('[class*="PinnedIcon"]');
+          if (pinEl) continue;
 
-      await page.goto(videoUrl, { waitUntil: "networkidle", timeout: 30000 });
-      await page.waitForTimeout(2000);
-
-      // SSR JSON
-      const videoStats = await page.evaluate(() => {
-        const scriptEl = document.querySelector(
-          'script#__UNIVERSAL_DATA_FOR_REHYDRATION__'
-        );
-        if (scriptEl?.textContent) {
-          try {
-            const data = JSON.parse(scriptEl.textContent);
-            const item =
-              data?.["__DEFAULT_SCOPE__"]?.["webapp.video-detail"]?.itemInfo
-                ?.itemStruct;
-            if (item) {
-              return {
-                createTime: item.createTime ? Number(item.createTime) : null,
-                playCount: item.stats?.playCount ?? null,
-                diggCount: item.stats?.diggCount ?? null,
-                collectCount: item.stats?.collectCount ?? null,
-              };
-            }
-          } catch { /* */ }
+          const viewEl = item.querySelector(
+            '[data-e2e="video-views"], strong.video-count'
+          );
+          const linkEl = item.querySelector('a[href*="/video/"]');
+          return {
+            href: linkEl?.getAttribute("href") ?? null,
+            views: viewEl?.textContent?.trim() ?? null,
+          };
         }
         return null;
       });
 
-      if (videoStats) {
-        if (videoStats.createTime) {
-          result.lastPostDate = new Date(videoStats.createTime * 1000)
-            .toISOString()
-            .split("T")[0];
-        }
-        // Only use SSR playCount if it's > 0 and we don't already have a value
-        const ssrPlay = toNum(videoStats.playCount);
-        if (ssrPlay !== null && ssrPlay > 0 && result.lastPostView === null) {
-          result.lastPostView = ssrPlay;
-        }
-        result.lastPostLike = toNum(videoStats.diggCount);
-        result.lastPostSave = toNum(videoStats.collectCount);
+      if (videoInfo?.views) {
+        result.lastPostView = parseNum(videoInfo.views);
       }
 
-      // DOM fallback for like/save
-      if (result.lastPostLike === null || result.lastPostSave === null) {
-        const domStats = await page.evaluate(() => {
-          const buttons = document.querySelectorAll("button");
-          let like: string | null = null;
-          let save: string | null = null;
-          for (const btn of buttons) {
-            const label = btn.getAttribute("aria-label") || "";
-            const strongEl = btn.querySelector("strong");
-            const val = strongEl?.textContent?.trim() ?? null;
-            if (label.includes("좋아요") || label.includes("like")) like = val;
-            if (label.includes("즐겨찾기") || label.includes("bookmark") || label.includes("favorite")) save = val;
-          }
-          return { like, save };
-        });
-        if (result.lastPostLike === null && domStats.like) result.lastPostLike = parseNum(domStats.like);
-        if (result.lastPostSave === null && domStats.save) result.lastPostSave = parseNum(domStats.save);
-      }
+      // --- Step 4: Video detail page if we found a link ---
+      if (videoInfo?.href) {
+        const videoUrl = videoInfo.href.startsWith("http")
+          ? videoInfo.href
+          : `https://www.tiktok.com${videoInfo.href}`;
 
-      // DOM fallback for date
-      if (result.lastPostDate === null) {
-        const dateText = await page.evaluate(() => {
-          const els = document.querySelectorAll("span, div");
-          for (const el of els) {
-            const text = el.textContent?.trim() || "";
-            if (/^·\s*\d/.test(text) && text.length < 30) return text.replace(/^·\s*/, "");
-            if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(text)) return text;
+        await page.goto(videoUrl, { waitUntil: "networkidle", timeout: 30000 });
+        await page.waitForTimeout(2000);
+
+        const videoStats = await page.evaluate(() => {
+          const scriptEl = document.querySelector(
+            'script#__UNIVERSAL_DATA_FOR_REHYDRATION__'
+          );
+          if (scriptEl?.textContent) {
+            try {
+              const data = JSON.parse(scriptEl.textContent);
+              const item =
+                data?.["__DEFAULT_SCOPE__"]?.["webapp.video-detail"]?.itemInfo
+                  ?.itemStruct;
+              if (item) {
+                return {
+                  createTime: item.createTime ? Number(item.createTime) : null,
+                  playCount: item.stats?.playCount ?? null,
+                  diggCount: item.stats?.diggCount ?? null,
+                  collectCount: item.stats?.collectCount ?? null,
+                };
+              }
+            } catch { /* */ }
           }
           return null;
         });
-        if (dateText) result.lastPostDate = parseRelativeDate(dateText);
+
+        if (videoStats) {
+          if (videoStats.createTime && result.lastPostDate === null) {
+            result.lastPostDate = new Date(videoStats.createTime * 1000)
+              .toISOString()
+              .split("T")[0];
+          }
+          const ssrPlay = toNum(videoStats.playCount);
+          if (ssrPlay !== null && ssrPlay > 0 && result.lastPostView === null) {
+            result.lastPostView = ssrPlay;
+          }
+          if (result.lastPostLike === null) result.lastPostLike = toNum(videoStats.diggCount);
+          if (result.lastPostSave === null) result.lastPostSave = toNum(videoStats.collectCount);
+        }
       }
+    }
+
+    if (result.lastPostView === null) {
+      console.warn(`[TikTok] Could not fetch video data for @${username} — bot detection likely active`);
     }
   } catch (e) {
     console.error(`[TikTok] Error scraping @${username}:`, e);
@@ -279,7 +285,10 @@ export async function scrapeTikTok(username: string): Promise<ScrapeResult> {
 }
 
 // ============================================================
-// Instagram — Playwright (reels page → followers + reel stats)
+// Instagram — Playwright (profile page → followers from og:description)
+// Note: Instagram requires login for most content. Without login,
+// only og:description meta tag is accessible (provides follower count).
+// Reel views/likes/dates require authenticated access.
 // ============================================================
 export async function scrapeInstagram(username: string): Promise<ScrapeResult> {
   const result = emptyResult("instagram", username);
@@ -288,111 +297,105 @@ export async function scrapeInstagram(username: string): Promise<ScrapeResult> {
   try {
     const page = await context.newPage();
 
-    // --- Step 1: Reels page → followers + first reel views ---
-    await page.goto(`https://www.instagram.com/${username}/reels/`, {
+    // Navigate to profile page (will redirect to login but og:description is still in HTML)
+    await page.goto(`https://www.instagram.com/${username}/`, {
       waitUntil: "domcontentloaded",
       timeout: 20000,
     });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
 
-    // Followers from og:description
+    // Followers from og:description (works even when redirected to login)
     const desc = await page.evaluate(() => {
       const m = document.querySelector('meta[property="og:description"]');
       return m?.getAttribute("content") ?? null;
     });
     if (desc) {
+      // Korean: "팔로워 306명" or "팔로워 2,709명"
       const kr = desc.match(/팔로워\s+([\d,만.]+)\s*명/);
       if (kr) result.followers = parseNum(kr[1]);
+      // English: "306 Followers"
       if (result.followers === null) {
         const en = desc.match(/([\d,KkMm.]+)\s+[Ff]ollowers/);
         if (en) result.followers = parseNum(en[1]);
       }
     }
 
-    // Fallback: DOM links "팔로워 306"
-    if (result.followers === null) {
-      const domFollowers = await page.evaluate(() => {
-        const links = document.querySelectorAll("a");
-        for (const a of links) {
-          const text = a.textContent?.trim() || "";
-          const m = text.match(/팔로워\s*([\d,만KkMm.]+)/);
-          if (m) return m[1];
-          const en = text.match(/([\d,KkMm.]+)\s*followers?/i);
-          if (en) return en[1];
-        }
-        return null;
+    // Check if we're on the actual profile page (not login redirect)
+    const currentUrl = page.url();
+    const isLoggedOut = currentUrl.includes("/accounts/login") ||
+      await page.evaluate(() => !!document.querySelector('input[name="username"]')).catch(() => true);
+
+    // If not behind login wall, try to get reel data
+    if (!isLoggedOut) {
+      // Try reels page
+      await page.goto(`https://www.instagram.com/${username}/reels/`, {
+        waitUntil: "domcontentloaded",
+        timeout: 20000,
       });
-      if (domFollowers) result.followers = parseNum(domFollowers);
-    }
-
-    // First reel views + href
-    const reelInfo = await page.evaluate(() => {
-      const firstReel = document.querySelector('a[href*="/reel/"]');
-      if (!firstReel) return null;
-      const href = firstReel.getAttribute("href");
-
-      // Views from ._aaj_ overlay (bottom overlay with view count)
-      const viewsOverlay = firstReel.querySelector("._aaj_");
-      let views: string | null = null;
-      if (viewsOverlay) {
-        const text = viewsOverlay.textContent?.trim() || "";
-        const nums = text.match(/(\d[\d,.KkMm만]*)/g);
-        if (nums && nums.length > 0) views = nums[nums.length - 1];
-      }
-
-      return { href, views };
-    });
-
-    if (reelInfo?.views) {
-      result.lastPostView = parseNum(reelInfo.views);
-    }
-
-    // --- Step 2: Reel detail page → likes + date ---
-    if (reelInfo?.href) {
-      const reelUrl = reelInfo.href.startsWith("http")
-        ? reelInfo.href
-        : `https://www.instagram.com${reelInfo.href}`;
-
-      await page.goto(reelUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
       await page.waitForTimeout(3000);
 
-      // Close signup dialog
-      try {
-        const closeBtn = page.locator('button:has(img[alt="닫기"])');
-        if (await closeBtn.isVisible({ timeout: 2000 })) {
-          await closeBtn.click();
-          await page.waitForTimeout(500);
+      // First reel views + href
+      const reelInfo = await page.evaluate(() => {
+        const firstReel = document.querySelector('a[href*="/reel/"]');
+        if (!firstReel) return null;
+        const href = firstReel.getAttribute("href");
+        const viewsOverlay = firstReel.querySelector("._aaj_");
+        let views: string | null = null;
+        if (viewsOverlay) {
+          const text = viewsOverlay.textContent?.trim() || "";
+          const nums = text.match(/(\d[\d,.KkMm만]*)/g);
+          if (nums && nums.length > 0) views = nums[nums.length - 1];
         }
-      } catch { /* */ }
-
-      const reelStats = await page.evaluate(() => {
-        let likes: string | null = null;
-        let dateStr: string | null = null;
-
-        // Like count: button containing just a number
-        const buttons = document.querySelectorAll("button");
-        for (const btn of buttons) {
-          const text = btn.textContent?.trim() || "";
-          if (/^\d[\d,.KkMm만]*$/.test(text) && text.length < 20) {
-            likes = text;
-            break;
-          }
-        }
-
-        // Date from <time> elements
-        const timeEls = document.querySelectorAll("time");
-        for (const t of timeEls) {
-          const text = t.textContent?.trim() || "";
-          if (text.length > 1 && /\d/.test(text)) {
-            dateStr = text;
-          }
-        }
-
-        return { likes, dateStr };
+        return { href, views };
       });
 
-      if (reelStats.likes) result.lastPostLike = parseNum(reelStats.likes);
-      if (reelStats.dateStr) result.lastPostDate = parseRelativeDate(reelStats.dateStr);
+      if (reelInfo?.views) {
+        result.lastPostView = parseNum(reelInfo.views);
+      }
+
+      // Reel detail page → likes + date
+      if (reelInfo?.href) {
+        const reelUrl = reelInfo.href.startsWith("http")
+          ? reelInfo.href
+          : `https://www.instagram.com${reelInfo.href}`;
+
+        await page.goto(reelUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
+        await page.waitForTimeout(3000);
+
+        try {
+          const closeBtn = page.locator('button:has(img[alt="닫기"])');
+          if (await closeBtn.isVisible({ timeout: 2000 })) {
+            await closeBtn.click();
+            await page.waitForTimeout(500);
+          }
+        } catch { /* */ }
+
+        const reelStats = await page.evaluate(() => {
+          let likes: string | null = null;
+          let dateStr: string | null = null;
+          const buttons = document.querySelectorAll("button");
+          for (const btn of buttons) {
+            const text = btn.textContent?.trim() || "";
+            if (/^\d[\d,.KkMm만]*$/.test(text) && text.length < 20) {
+              likes = text;
+              break;
+            }
+          }
+          const timeEls = document.querySelectorAll("time");
+          for (const t of timeEls) {
+            const text = t.textContent?.trim() || "";
+            if (text.length > 1 && /\d/.test(text)) {
+              dateStr = text;
+            }
+          }
+          return { likes, dateStr };
+        });
+
+        if (reelStats.likes) result.lastPostLike = parseNum(reelStats.likes);
+        if (reelStats.dateStr) result.lastPostDate = parseRelativeDate(reelStats.dateStr);
+      }
+    } else {
+      console.warn(`[Instagram] Login wall detected for @${username} — only follower count available`);
     }
   } catch (e) {
     console.error(`[Instagram] Error scraping @${username}:`, e);

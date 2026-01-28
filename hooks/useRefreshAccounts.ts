@@ -132,6 +132,26 @@ export function useRefreshAccounts() {
         if (data) {
           await applyScrapeResult(accountId, data);
 
+          // Show feedback about what was fetched
+          const fetched: string[] = [];
+          const missed: string[] = [];
+          if (data.followers !== null) fetched.push("followers");
+          else missed.push("followers");
+          if (data.lastPostDate !== null) fetched.push("date");
+          else missed.push("date");
+          if (data.lastPostView !== null) fetched.push("views");
+          else missed.push("views");
+          if (data.lastPostLike !== null) fetched.push("likes");
+          else missed.push("likes");
+          if (data.lastPostSave !== null) fetched.push("saves");
+          else missed.push("saves");
+
+          if (fetched.length > 0 && missed.length > 0) {
+            toast.info(`${account.username}: fetched ${fetched.join(", ")} (${missed.join(", ")} unavailable)`);
+          } else if (fetched.length === 0) {
+            toast.error(`${account.username}: no data could be fetched`);
+          }
+
           // Shadowban detection: if lastPostView is exactly 0, schedule re-check
           if (data.lastPostView === 0) {
             scheduleShadowbanCheck(accountId);
