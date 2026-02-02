@@ -101,14 +101,17 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
       const res = await fetch("/api/data");
       if (!res.ok) throw new Error(`Failed to fetch data: ${res.status}`);
       const data = await res.json();
+      const loadedPlatforms: Platform[] = data.platforms ?? [];
+      const tiktokPlatform = loadedPlatforms.find((p: Platform) => p.name === "tiktok");
       set({
         regions: data.regions ?? [],
         languages: data.languages ?? [],
-        platforms: data.platforms ?? [],
+        platforms: loadedPlatforms,
         tags: data.tags ?? [],
         accounts: data.accounts ?? [],
         selectedRegion: data.regions?.[0]?.code ?? "",
         selectedLanguage: data.languages?.[0]?.code ?? "",
+        platformFilter: tiktokPlatform?.id ?? null,
         isLoading: false,
       });
     } catch (e) {

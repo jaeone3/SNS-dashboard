@@ -75,6 +75,7 @@ model Account {
   id           String   @id @default(uuid())
   platformId   String
   username     String
+  displayName  String?  // user-friendly name shown in dashboard
   regionCode   String
   languageCode String // stores Language.code
 

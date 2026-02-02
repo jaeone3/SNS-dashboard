@@ -7,21 +7,19 @@ import { TagSelector } from "@/components/common/TagSelector";
 import { InlineEditCell } from "./InlineEditCell";
 import { useDashboardStore } from "@/stores/dashboard-store";
 import { toast } from "@/stores/toast-store";
-import { ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import type { Account } from "@/types";
 
 interface AccountTableRowProps {
   account: Account;
   onRefresh: (accountId: string) => Promise<void>;
   isRefreshing: boolean;
-  isShadowbanChecking?: boolean;
 }
 
 export const AccountTableRow = ({
   account,
   onRefresh,
   isRefreshing,
-  isShadowbanChecking = false,
 }: AccountTableRowProps) => {
   const platforms = useDashboardStore((s) => s.platforms);
   const tags = useDashboardStore((s) => s.tags);
@@ -42,6 +40,16 @@ export const AccountTableRow = ({
     facebook: "rgba(24,119,242,0.05)",
   };
   const rowBg = platform ? platformBg[platform.name] ?? undefined : undefined;
+
+  // Shadowban detection: yesterday's post with <100 views
+  const isShadowbanView = (() => {
+    if (account.lastPostDate === null || account.lastPostView === null) return false;
+    if (account.lastPostView >= 100) return false;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    return account.lastPostDate === yesterdayStr;
+  })();
 
   const handleSave = async (field: keyof Account, value: number | string | null) => {
     try {
@@ -79,11 +87,11 @@ export const AccountTableRow = ({
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-black"
           >
-            {account.username}
+            {account.displayName || account.username}
             <ExternalLink size={12} className="text-neutral-400" />
           </a>
         ) : (
-          account.username
+          account.displayName || account.username
         )}
       </TableCell>
 
@@ -114,26 +122,7 @@ export const AccountTableRow = ({
           onSave={(v) => handleSave("lastPostView", v)}
           type="number"
           align="center"
-        />
-      </TableCell>
-
-      {/* Last Post Like */}
-      <TableCell className="text-center">
-        <InlineEditCell
-          value={account.lastPostLike}
-          onSave={(v) => handleSave("lastPostLike", v)}
-          type="number"
-          align="center"
-        />
-      </TableCell>
-
-      {/* Last Post Save */}
-      <TableCell className="text-center">
-        <InlineEditCell
-          value={account.lastPostSave}
-          onSave={(v) => handleSave("lastPostSave", v)}
-          type="number"
-          align="center"
+          className={isShadowbanView ? "text-red-500 font-semibold" : undefined}
         />
       </TableCell>
 
@@ -152,18 +141,9 @@ export const AccountTableRow = ({
         </TagSelector>
       </TableCell>
 
-      {/* Refresh + Shadowban Check Indicator */}
+      {/* Refresh */}
       <TableCell className="text-center">
         <div className="inline-flex items-center gap-1">
-          {isShadowbanChecking && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 ring-1 ring-amber-200"
-              title="Shadowban re-check pending — will re-scrape in ~10 min"
-            >
-              <ShieldAlert size={11} className="animate-pulse" />
-              Checking
-            </span>
-          )}
           <button
             onClick={() => onRefresh(account.id)}
             disabled={isRefreshing}

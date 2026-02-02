@@ -10,6 +10,7 @@ interface InlineEditCellProps {
   type: "number" | "date";
   align?: "left" | "right" | "center";
   placeholder?: string;
+  className?: string;
 }
 
 export const InlineEditCell = ({
@@ -18,6 +19,7 @@ export const InlineEditCell = ({
   type,
   align = "left",
   placeholder = "-",
+  className: extraClassName,
 }: InlineEditCellProps) => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -128,7 +130,8 @@ export const InlineEditCell = ({
         "block cursor-pointer rounded px-1 py-0.5 text-sm tabular-nums transition-colors hover:bg-neutral-100",
         align === "right" && "text-right",
         align === "center" && "text-center",
-        displayValue === placeholder && "text-neutral-400"
+        displayValue === placeholder && "text-neutral-400",
+        extraClassName
       )}
     >
       {displayValue}

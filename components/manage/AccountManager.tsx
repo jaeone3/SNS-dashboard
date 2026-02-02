@@ -45,6 +45,7 @@ export const AccountManager = () => {
   const [linkInput, setLinkInput] = useState("");
   const [platformId, setPlatformId] = useState("");
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [linkParsed, setLinkParsed] = useState(false);
 
@@ -62,6 +63,7 @@ export const AccountManager = () => {
     setLinkInput("");
     setPlatformId("");
     setUsername("");
+    setDisplayName("");
     setError("");
     setLinkParsed(false);
     setScraping(false);
@@ -163,6 +165,7 @@ export const AccountManager = () => {
        await addAccount({
          platformId,
          username,
+         displayName: displayName.trim() || null,
          regionCode,
          languageCode,
          followers: scraped?.followers ?? null,
@@ -237,7 +240,7 @@ export const AccountManager = () => {
                 {platform && (
                   <PlatformIcon iconName={platform.iconName} size={16} />
                 )}
-                <span className="font-medium">{account.username}</span>
+                <span className="font-medium">{account.displayName || account.username}</span>
                 <CircleFlag countryCode={account.regionCode} size={14} />
                 <span className="text-neutral-400">
                   {account.regionCode} / {account.languageCode}
@@ -398,6 +401,12 @@ export const AccountManager = () => {
                 setUsername(e.target.value);
                 setLinkParsed(false);
               }}
+            />
+
+            <Input
+              placeholder="Display Name (optional)"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
             />
 
             {error && <p className="text-sm text-red-500">{error}</p>}

@@ -44,3 +44,9 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# TikTok login cookies (sensitive)
+.tiktok-cookies.json
+
+# Browser login sessions (sensitive — contains cookies)
+/browser-data/

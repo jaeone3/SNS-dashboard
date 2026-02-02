@@ -18,7 +18,6 @@ import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 interface AccountTableProps {
   refreshOne: (accountId: string) => Promise<void>;
   refreshingIds: Set<string>;
-  shadowbanCheckingIds?: Set<string>;
 }
 
 type SortField = "followers" | "lastPostView" | null;
@@ -27,7 +26,6 @@ type SortDirection = "asc" | "desc";
 export const AccountTable = ({
   refreshOne,
   refreshingIds,
-  shadowbanCheckingIds = new Set(),
 }: AccountTableProps) => {
   const allAccounts = useDashboardStore((s) => s.accounts);
   const platforms = useDashboardStore((s) => s.platforms);
@@ -132,8 +130,6 @@ export const AccountTable = ({
               <TableHead className="text-center bg-white">
                 <SortButton field="lastPostView" label="Latest Post View" />
               </TableHead>
-              <TableHead className="text-center bg-white">Latest Post Like</TableHead>
-              <TableHead className="text-center bg-white">Latest Post Save</TableHead>
               <TableHead className="text-center bg-white">
                 <TagFilterDropdown />
               </TableHead>
@@ -147,7 +143,6 @@ export const AccountTable = ({
                 account={account}
                 onRefresh={refreshOne}
                 isRefreshing={refreshingIds.has(account.id)}
-                isShadowbanChecking={shadowbanCheckingIds.has(account.id)}
               />
             ))}
           </TableBody>

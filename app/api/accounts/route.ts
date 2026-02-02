@@ -4,9 +4,10 @@ import { prisma } from "@/lib/db";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { platformId, username, regionCode, languageCode } = body as {
+    const { platformId, username, displayName, regionCode, languageCode } = body as {
       platformId: string;
       username: string;
+      displayName?: string;
       regionCode: string;
       languageCode: string;
     };
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
         ...(body.id ? { id: body.id } : {}),
         platformId,
         username,
+        displayName: displayName || null,
         regionCode,
         languageCode,
         followers: body.followers ?? null,
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
       id: account.id,
       platformId: account.platformId,
       username: account.username,
+      displayName: account.displayName,
       regionCode: account.regionCode,
       languageCode: account.languageCode,
       followers: account.followers,
@@ -66,6 +69,7 @@ export async function POST(request: Request) {
       updatedAt: account.updatedAt.toISOString(),
     });
   } catch (error) {
+    console.error("[POST /api/accounts] Error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       { error: `Failed to create account: ${message}` },
@@ -81,6 +85,7 @@ export async function PUT(request: Request) {
       id: string;
       platformId?: string;
       username?: string;
+      displayName?: string | null;
       regionCode?: string;
       languageCode?: string;
       followers?: number | null;
@@ -107,6 +112,7 @@ export async function PUT(request: Request) {
       id: account.id,
       platformId: account.platformId,
       username: account.username,
+      displayName: account.displayName,
       regionCode: account.regionCode,
       languageCode: account.languageCode,
       followers: account.followers,

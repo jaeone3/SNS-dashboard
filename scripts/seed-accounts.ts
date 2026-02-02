@@ -34,10 +34,10 @@ const SEED_ACCOUNTS: SeedAccount[] = [
   { seedPlatformId: "plt-instagram", username: "kcontents_everyday", regionCode: "KR", languageCode: "EN" },
 
   // ===== Facebook (6) =====
-  { seedPlatformId: "plt-facebook", username: "DelpKorean", regionCode: "KR", languageCode: "EN" },
+  { seedPlatformId: "plt-facebook", username: "61565488769929", regionCode: "KR", languageCode: "EN" },
   { seedPlatformId: "plt-facebook", username: "LearnKoreaneasily", regionCode: "KR", languageCode: "EN" },
   { seedPlatformId: "plt-facebook", username: "KokoKorean", regionCode: "KR", languageCode: "EN" },
-  { seedPlatformId: "plt-facebook", username: "Snu_d-school", regionCode: "KR", languageCode: "EN" },
+  { seedPlatformId: "plt-facebook", username: "61551627689772", regionCode: "KR", languageCode: "EN" },
   { seedPlatformId: "plt-facebook", username: "Easykorean", regionCode: "KR", languageCode: "EN" },
   { seedPlatformId: "plt-facebook", username: "ZEFIT", regionCode: "KR", languageCode: "EN" },
 

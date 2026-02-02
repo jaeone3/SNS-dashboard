@@ -1,37 +1,21 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useDashboardStore } from "@/stores/dashboard-store";
 import { toast } from "@/stores/toast-store";
 import type { ScrapeResult } from "@/app/api/scrape/route";
 
 const SHADOWBAN_TAG_LABEL = "#Shadowban";
-const SHADOWBAN_RECHECK_DELAY = 10 * 60 * 1000; // 10 minutes
 
 export function useRefreshAccounts() {
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
-  const [shadowbanCheckingIds, setShadowbanCheckingIds] = useState<Set<string>>(
-    new Set()
-  );
   const accounts = useDashboardStore((s) => s.accounts);
   const platforms = useDashboardStore((s) => s.platforms);
   const tags = useDashboardStore((s) => s.tags);
   const updateAccount = useDashboardStore((s) => s.updateAccount);
   const assignTag = useDashboardStore((s) => s.assignTag);
+  const unassignTag = useDashboardStore((s) => s.unassignTag);
   const getFilteredAccounts = useDashboardStore((s) => s.getFilteredAccounts);
-
-  // Track pending shadowban re-check timeouts for cleanup
-  const shadowbanTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map()
-  );
-
-  // Cleanup all timers on unmount
-  useEffect(() => {
-    return () => {
-      shadowbanTimers.current.forEach((timer) => clearTimeout(timer));
-      shadowbanTimers.current.clear();
-    };
-  }, []);
 
   /** Scrape a single account and return the result (or null on failure). */
   const scrapeAccount = useCallback(
@@ -71,54 +55,6 @@ export function useRefreshAccounts() {
     [updateAccount]
   );
 
-  /** Schedule a shadowban re-check for an account after the delay. */
-  const scheduleShadowbanCheck = useCallback(
-    (accountId: string) => {
-      // Clear any existing timer for this account
-      const existing = shadowbanTimers.current.get(accountId);
-      if (existing) clearTimeout(existing);
-
-      setShadowbanCheckingIds((prev) => new Set(prev).add(accountId));
-
-      const timer = setTimeout(async () => {
-        shadowbanTimers.current.delete(accountId);
-
-        // Re-scrape
-        setRefreshingIds((prev) => new Set(prev).add(accountId));
-        try {
-          const data = await scrapeAccount(accountId);
-          if (data) {
-            await applyScrapeResult(accountId, data);
-            // If lastPostView is still exactly 0, assign shadowban tag
-            if (data.lastPostView === 0) {
-              const shadowbanTag = tags.find((t) => t.label === SHADOWBAN_TAG_LABEL);
-              if (shadowbanTag) {
-                assignTag(accountId, shadowbanTag.id);
-              }
-            }
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Unknown error";
-          toast.error(`Shadowban re-check failed: ${msg}`);
-        } finally {
-          setRefreshingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(accountId);
-            return next;
-          });
-          setShadowbanCheckingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(accountId);
-            return next;
-          });
-        }
-      }, SHADOWBAN_RECHECK_DELAY);
-
-      shadowbanTimers.current.set(accountId, timer);
-    },
-    [scrapeAccount, applyScrapeResult, assignTag, tags]
-  );
-
   const refreshOne = useCallback(
     async (accountId: string) => {
       const account = accounts.find((a) => a.id === accountId);
@@ -152,9 +88,24 @@ export function useRefreshAccounts() {
             toast.error(`${account.username}: no data could be fetched`);
           }
 
-          // Shadowban detection: if lastPostView is exactly 0, schedule re-check
-          if (data.lastPostView === 0) {
-            scheduleShadowbanCheck(accountId);
+          // Shadowban auto-tagging
+          const shadowbanTag = tags.find((t) => t.label === SHADOWBAN_TAG_LABEL);
+          if (shadowbanTag && data.lastPostDate !== null && data.lastPostView !== null) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+            if (data.lastPostDate === yesterdayStr && data.lastPostView < 100) {
+              // Assign shadowban tag
+              if (!account.tagIds.includes(shadowbanTag.id)) {
+                assignTag(accountId, shadowbanTag.id);
+              }
+            } else {
+              // Remove shadowban tag if views recovered
+              if (account.tagIds.includes(shadowbanTag.id)) {
+                unassignTag(accountId, shadowbanTag.id);
+              }
+            }
           }
         } else {
           const acct = accounts.find((a) => a.id === accountId);
@@ -172,44 +123,31 @@ export function useRefreshAccounts() {
         });
       }
     },
-    [accounts, platforms, scrapeAccount, applyScrapeResult, scheduleShadowbanCheck]
+    [accounts, platforms, scrapeAccount, applyScrapeResult, tags, assignTag, unassignTag]
   );
 
   const refreshAll = useCallback(async () => {
     const visible = getFilteredAccounts();
 
-    // Platforms that need sequential scraping with delay to avoid bot detection
-    const sequentialPlatformNames = ["tiktok", "instagram"];
-
-    const sequentialPlatforms = platforms.filter((p) =>
-      sequentialPlatformNames.includes(p.name.toLowerCase())
-    );
-    const sequentialPlatformIds = new Set(sequentialPlatforms.map((p) => p.id));
-
-    const sequentialAccounts = visible.filter((a) =>
-      sequentialPlatformIds.has(a.platformId)
-    );
-    const parallelAccounts = visible.filter(
-      (a) => !sequentialPlatformIds.has(a.platformId)
+    const tiktokPlatformIds = new Set(
+      platforms.filter((p) => p.name.toLowerCase() === "tiktok").map((p) => p.id)
     );
 
-    // YouTube, Facebook, etc. run in parallel
-    const parallelPromise = Promise.allSettled(
-      parallelAccounts.map((a) => refreshOne(a.id))
+    const tiktokAccounts = visible.filter((a) => tiktokPlatformIds.has(a.platformId));
+    const otherAccounts = visible.filter((a) => !tiktokPlatformIds.has(a.platformId));
+
+    // Non-TikTok (YouTube, Facebook, etc.) run fully in parallel
+    const otherPromise = Promise.allSettled(
+      otherAccounts.map((a) => refreshOne(a.id))
     );
 
-    // TikTok & Instagram run sequentially with 3-5s random delay between each
-    const sequentialPromise = (async () => {
-      for (let i = 0; i < sequentialAccounts.length; i++) {
-        await refreshOne(sequentialAccounts[i].id);
-        if (i < sequentialAccounts.length - 1) {
-          const delay = 3000 + Math.random() * 2000; // 3-5 seconds
-          await new Promise((r) => setTimeout(r, delay));
-        }
-      }
-    })();
+    // TikTok: server-side concurrency pool handles parallelism (3 slots).
+    // Client sends all requests — the server queues them automatically.
+    const tiktokPromise = Promise.allSettled(
+      tiktokAccounts.map((a) => refreshOne(a.id))
+    );
 
-    await Promise.allSettled([parallelPromise, sequentialPromise]);
+    await Promise.allSettled([otherPromise, tiktokPromise]);
   }, [getFilteredAccounts, refreshOne, platforms]);
 
   return {
@@ -217,6 +155,5 @@ export function useRefreshAccounts() {
     refreshAll,
     refreshingIds,
     isRefreshing: refreshingIds.size > 0,
-    shadowbanCheckingIds,
   };
 }

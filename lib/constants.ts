@@ -77,6 +77,7 @@ const _acc = (
   id,
   platformId,
   username,
+  displayName: null,
   regionCode,
   languageCode,
   followers: null,
@@ -110,10 +111,10 @@ export const SEED_ACCOUNTS: Account[] = [
   _acc("acc-ig-6", "plt-instagram", "kcontents_everyday"),
 
   // ===== Facebook (6) =====
-  _acc("acc-fb-1", "plt-facebook", "DelpKorean"),
+  _acc("acc-fb-1", "plt-facebook", "61565488769929"),
   _acc("acc-fb-2", "plt-facebook", "LearnKoreaneasily"),
   _acc("acc-fb-3", "plt-facebook", "KokoKorean"),
-  _acc("acc-fb-4", "plt-facebook", "Snu_d-school"),
+  _acc("acc-fb-4", "plt-facebook", "61551627689772"),
   _acc("acc-fb-5", "plt-facebook", "Easykorean"),
   _acc("acc-fb-6", "plt-facebook", "ZEFIT"),
 

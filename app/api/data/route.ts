@@ -49,6 +49,7 @@ export async function GET() {
       id: a.id,
       platformId: a.platformId,
       username: a.username,
+      displayName: a.displayName,
       regionCode: a.regionCode,
       languageCode: a.languageCode,
       followers: a.followers,

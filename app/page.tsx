@@ -14,7 +14,7 @@ import { RefreshCw, AlertCircle } from "lucide-react";
 
 export default function Home() {
   const [manageOpen, setManageOpen] = useState(false);
-  const { refreshOne, refreshAll, refreshingIds, isRefreshing, shadowbanCheckingIds } =
+  const { refreshOne, refreshAll, refreshingIds, isRefreshing } =
     useRefreshAccounts();
   const isLoading = useDashboardStore((s) => s.isLoading);
   const error = useDashboardStore((s) => s.error);
@@ -99,7 +99,6 @@ export default function Home() {
           <AccountTable
             refreshOne={refreshOne}
             refreshingIds={refreshingIds}
-            shadowbanCheckingIds={shadowbanCheckingIds}
           />
         </div>
       </main>

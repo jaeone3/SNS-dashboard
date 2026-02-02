@@ -36,6 +36,7 @@ export interface Account {
   id: string;
   platformId: string; // -> Platform.id
   username: string; // platform @username
+  displayName: string | null; // user-friendly name shown in dashboard
   regionCode: string; // -> Region.code
   languageCode: string; // -> Language.code
 
