@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# build
+.next/
+tsconfig.tsbuildinfo
+
+# env (contains DB passwords, API keys)
+.env
+.env.local
+
+# logs
+logs/
+
+# misc
+nul
