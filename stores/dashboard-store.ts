@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Region, Language, Device, DeviceState } from "@/types";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 interface DashboardState {
   regions: Region[];
   languages: Language[];
@@ -52,7 +54,7 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
     const isInitial = current.regions.length === 0;
     set({ isLoading: isInitial, error: null });
     try {
-      const res = await fetch("/api/data");
+      const res = await fetch(`${API_BASE}/api/data`);
       if (!res.ok) throw new Error(`Failed to fetch data: ${res.status}`);
       const data = await res.json();
       const regions = data.regions ?? [];
@@ -92,7 +94,7 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
     if (!device) return;
 
     const updated = { ...device.state, ...partial };
-    const res = await fetch(`/api/devices/${deviceId}/state`, {
+    const res = await fetch(`${API_BASE}/api/devices/${deviceId}/state`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updated),
