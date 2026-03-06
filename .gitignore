@@ -12,5 +12,15 @@ tsconfig.tsbuildinfo
 # logs
 logs/
 
+# runtime data (dashboard state JSON)
+/data/
+
+# tooling
+.claude/
+.playwright-mcp/
+
+# screenshots
+screenshot-*.png
+
 # misc
 nul

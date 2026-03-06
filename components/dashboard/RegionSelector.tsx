@@ -15,13 +15,18 @@ export const RegionSelector = () => {
   const selectedRegion = useDashboardStore((s) => s.selectedRegion);
   const setRegion = useDashboardStore((s) => s.setRegion);
 
+  const selectedCountryCode =
+    regions.find((r) => r.code === selectedRegion)?.countryCode ?? selectedRegion;
+
   return (
     <Select value={selectedRegion} onValueChange={setRegion}>
-      <SelectTrigger className="w-[120px] rounded-md border border-neutral-300 bg-white">
+      <SelectTrigger className="w-[160px] rounded-md border border-neutral-300 bg-white">
         <SelectValue>
           <span className="flex items-center gap-2">
-            <CircleFlag countryCode={selectedRegion} size={18} />
-            <span className="font-medium">{selectedRegion}</span>
+            <CircleFlag countryCode={selectedCountryCode} size={18} />
+            <span className="font-medium">
+              {regions.find((r) => r.code === selectedRegion)?.name ?? selectedRegion}
+            </span>
           </span>
         </SelectValue>
       </SelectTrigger>
@@ -29,8 +34,8 @@ export const RegionSelector = () => {
         {regions.map((region) => (
           <SelectItem key={region.code} value={region.code}>
             <span className="flex items-center gap-2">
-              <CircleFlag countryCode={region.code} size={18} />
-              <span className="font-medium">{region.code}</span>
+              <CircleFlag countryCode={region.countryCode} size={18} />
+              <span className="font-medium">{region.name}</span>
             </span>
           </SelectItem>
         ))}

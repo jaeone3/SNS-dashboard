@@ -1,55 +1,66 @@
-// ===== Region (Country) =====
+// ===== Region (Content Language) =====
 export interface Region {
-  code: string; // "KR", "US", "JP"
-  name: string; // "Korea"
-  flagEmoji: string; // "🇰🇷"
-  languageIds: string[]; // -> Language.id[] — which languages belong to this region
+  code: string;
+  name: string;
+  countryCode: string;
+  flagEmoji: string;
+  languageIds: string[];
 }
 
-// ===== Language (Tab) =====
+// ===== Language (Target Audience) =====
 export interface Language {
   id: string;
-  code: string; // "EN", "JP", "SP", "CN"
-  label: string; // "English"
-  countryCode: string; // ISO country code for flag — "US", "JP", "ES", "CN"
+  code: string;
+  label: string;
+  countryCode: string;
   sortOrder: number;
 }
 
-// ===== Platform =====
-export interface Platform {
-  id: string;
-  name: string; // "tiktok" (lowercase, unique key)
-  displayName: string; // "TikTok"
-  iconName: string; // lucide-react icon name or custom identifier
-  profileUrlTemplate: string; // e.g. "https://www.tiktok.com/@{username}"
+// ===== Platform config per device (from device_config.json) =====
+export interface DevicePlatformConfig {
+  enabled: boolean;
+  schedule_hours: number;
+  phone_video_dir: string;
+  location: string | null;
+  account: string;
 }
 
-// ===== Tag (ETC column) =====
-export interface Tag {
-  id: string;
-  label: string; // "#Shadowban"
-  color: string; // hex "#ef4444"
+// ===== Account slot (stored in dashboard-state.json) =====
+export interface AccountSlot {
+  username: string;
+  shadowban: boolean;
+  shadowbanDate: string | null;
+  shadowbanCount: number;
 }
 
-// ===== SNS Account (main entity) =====
-export interface Account {
+// ===== Device state (stored in dashboard-state.json) =====
+export interface DeviceState {
+  isNew: boolean;
+  newDeviceDate: string | null;
+  suspended: boolean;
+  tiktok: (AccountSlot | null)[];
+  instagram: (AccountSlot | null)[];
+  youtube: (AccountSlot | null)[];
+}
+
+// ===== Device (merged: config + state) =====
+export interface Device {
   id: string;
-  platformId: string; // -> Platform.id
-  username: string; // platform @username
-  displayName: string | null; // user-friendly name shown in dashboard
-  regionCode: string; // -> Region.code
-  languageCode: string; // -> Language.code
-
-  // Latest post metrics (manual input)
-  followers: number | null;
-  lastPostDate: string | null; // "YYYY-MM-DD"
-  lastPostView: number | null;
-  lastPostLike: number | null;
-  lastPostSave: number | null;
-
-  // Tags
-  tagIds: string[]; // -> Tag.id[]
-
-  createdAt: string; // ISO datetime
-  updatedAt: string; // ISO datetime
+  number: number;
+  name: string;
+  host: string;
+  phase: string;
+  model: string;
+  deviceLocale: string;
+  systemPort: number;
+  vpnApp: string;
+  vpnRegion: string;
+  vpnCity: string;
+  contentLanguage: string;
+  targetAudience: string;
+  contentType: string;
+  uploadDir: string;
+  uploadedDir: string;
+  platforms: Record<string, DevicePlatformConfig>;
+  state: DeviceState;
 }

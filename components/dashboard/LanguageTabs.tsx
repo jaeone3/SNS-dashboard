@@ -17,7 +17,7 @@ export const LanguageTabs = () => {
   if (sorted.length === 0) {
     return (
       <p className="text-sm text-neutral-400">
-        No languages assigned. Add from Manage.
+        할당된 언어가 없습니다.
       </p>
     );
   }
@@ -38,7 +38,7 @@ export const LanguageTabs = () => {
             )}
           >
             <CircleFlag countryCode={lang.countryCode} size={16} />
-            {lang.code}
+            {lang.label}
           </button>
         );
       })}
