@@ -112,6 +112,7 @@ interface ActionItem {
   deviceId: string;
   deviceNumber: number;
   label: string;
+  langLabel: string;
   platform?: "tiktok" | "instagram" | "youtube";
   slotIndex?: number;
 }
@@ -119,7 +120,7 @@ interface ActionItem {
 function ActionChecklist() {
   const devices = useDashboardStore((s) => s.devices);
   const selectedRegion = useDashboardStore((s) => s.selectedRegion);
-  const selectedLanguage = useDashboardStore((s) => s.selectedLanguage);
+  const languages = useDashboardStore((s) => s.languages);
   const updateDeviceState = useDashboardStore((s) => s.updateDeviceState);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -127,11 +128,15 @@ function ActionChecklist() {
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const items: ActionItem[] = [];
 
+  const langMap: Record<string, string> = {};
+  for (const l of languages) langMap[l.code] = l.label;
+
   const filtered = devices.filter(
-    (d) => d.contentLanguage === selectedRegion && d.targetAudience === selectedLanguage,
+    (d) => d.contentLanguage === selectedRegion,
   );
 
   for (const d of filtered) {
+    const langLabel = langMap[d.targetAudience] ?? d.targetAudience;
     // SB ready to lift
     for (const p of ["tiktok", "instagram", "youtube"] as const) {
       for (let i = 0; i < (d.state[p]?.length ?? 0); i++) {
@@ -142,12 +147,14 @@ function ActionChecklist() {
           : 0;
         if (elapsed >= THREE_DAYS_MS) {
           const pLabel = p === "tiktok" ? "TT" : p === "instagram" ? "IG" : "YT";
+          const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
           items.push({
             id: `sb-${d.id}-${p}-${i}`,
             type: "sb_ready",
             deviceId: d.id,
             deviceNumber: d.number,
-            label: `#${d.number} ${pLabel}${i + 1} @${slot.username} — SB 해제가능`,
+            label: `#${d.number} ${pLabel}${i + 1} @${slot.username} — SB ${daysElapsed}일 경과, 해제가능`,
+            langLabel,
             platform: p,
             slotIndex: i,
           });
@@ -163,6 +170,7 @@ function ActionChecklist() {
         deviceId: d.id,
         deviceNumber: d.number,
         label: `#${d.number} — 정지됨`,
+        langLabel,
       });
     }
 
@@ -182,6 +190,7 @@ function ActionChecklist() {
           deviceId: d.id,
           deviceNumber: d.number,
           label: `#${d.number} — 미연결`,
+          langLabel,
         });
       }
     }
@@ -249,6 +258,9 @@ function ActionChecklist() {
               onChange={() => handleCheck(item)}
               disabled={processing.has(item.id)}
             />
+            <span className="inline-flex items-center gap-1.5 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-medium text-neutral-500">
+              {item.langLabel}
+            </span>
             <span className={`text-sm ${typeStyle[item.type] ?? "text-neutral-600"}`}>
               {item.label}
             </span>

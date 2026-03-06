@@ -19,6 +19,8 @@ export const RegionSelector = () => {
     regions.find((r) => r.code === selectedRegion)?.countryCode ?? selectedRegion;
 
   return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wide">콘텐츠</span>
     <Select value={selectedRegion} onValueChange={setRegion}>
       <SelectTrigger className="w-[160px] rounded-md border border-neutral-300 bg-white">
         <SelectValue>
@@ -41,5 +43,6 @@ export const RegionSelector = () => {
         ))}
       </SelectContent>
     </Select>
+    </div>
   );
 };

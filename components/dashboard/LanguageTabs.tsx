@@ -24,6 +24,7 @@ export const LanguageTabs = () => {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wide mr-0.5">타겟</span>
       {sorted.map((lang) => {
         const isActive = lang.code === selectedLanguage;
         return (
