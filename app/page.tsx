@@ -51,7 +51,7 @@ function DeviceBattery() {
   if (regionDevices.length === 0) return null;
 
   return (
-    <div className="mb-4 flex flex-col gap-2">
+    <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1">
       {languages.map((lang) => {
         const filtered = regionDevices.filter((d) => d.targetAudience === lang.code);
         if (filtered.length === 0) return null;
@@ -67,36 +67,28 @@ function DeviceBattery() {
         const normalPct = Math.round((counts.normal / total) * 100);
 
         return (
-          <div key={lang.code} className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 w-20 shrink-0">
-              <CircleFlag countryCode={lang.countryCode} size={14} />
-              <span className="text-xs font-semibold text-neutral-500 truncate">{lang.label}</span>
+          <div key={lang.code} className="flex items-center gap-1.5">
+            <CircleFlag countryCode={lang.countryCode} size={13} />
+            <span className="text-[11px] font-semibold text-neutral-500 w-12 truncate">{lang.label}</span>
+
+            {/* Battery gauge */}
+            <div className="flex items-center">
+              <div className="relative w-28 h-4 rounded-[3px] border-2 border-neutral-300 bg-neutral-100 overflow-hidden">
+                <div className="absolute inset-[1.5px] flex gap-px rounded-[1.5px] overflow-hidden">
+                  {segments.map((seg) => (
+                    <div
+                      key={seg.status}
+                      className={`${statusConfig[seg.status].bg} transition-all duration-300`}
+                      style={{ flex: seg.count }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="w-[3px] h-2 rounded-r-[1.5px] bg-neutral-300 -ml-px" />
             </div>
 
-            {/* Modern progress bar */}
-            <div className="flex-1 max-w-48 h-2 rounded-full bg-neutral-100 overflow-hidden flex">
-              {segments.map((seg) => (
-                <div
-                  key={seg.status}
-                  className={`${statusConfig[seg.status].bg} transition-all duration-500 first:rounded-l-full last:rounded-r-full`}
-                  style={{ width: `${(seg.count / total) * 100}%` }}
-                />
-              ))}
-            </div>
-
-            <span className="text-xs font-bold text-neutral-600 w-8 tabular-nums">{normalPct}%</span>
-
-            <div className="flex items-center gap-2">
-              {segments.map((seg) => (
-                <span
-                  key={seg.status}
-                  className={`inline-flex items-center gap-1 text-[11px] font-medium ${statusConfig[seg.status].text}`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[seg.status].bg}`} />
-                  {seg.count}
-                </span>
-              ))}
-            </div>
+            <span className="text-[11px] font-bold text-neutral-500 tabular-nums w-7">{normalPct}%</span>
+            <span className="text-[10px] text-neutral-400 tabular-nums">{counts.normal}/{total}</span>
           </div>
         );
       })}
