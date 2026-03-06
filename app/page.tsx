@@ -9,7 +9,7 @@ import { useDashboardStore } from "@/stores/dashboard-store";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { ToastContainer } from "@/components/common/ToastContainer";
 import { toast } from "@/stores/toast-store";
-import { AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { CircleFlag } from "@/components/common/CircleFlag";
 import type { Device } from "@/types";
 
@@ -40,8 +40,8 @@ const statusConfig: Record<DeviceStatus, { bg: string; text: string; label: stri
   unconnected: { bg: "bg-neutral-300", text: "text-neutral-400", label: "미연결" },
 };
 
-/* ─── Status Overview (all languages) ─── */
-function DeviceBattery() {
+/* ─── Status Overview ─── */
+function StatusOverview() {
   const devices = useDashboardStore((s) => s.devices);
   const selectedRegion = useDashboardStore((s) => s.selectedRegion);
   const getLanguagesForRegion = useDashboardStore((s) => s.getLanguagesForRegion);
@@ -50,48 +50,73 @@ function DeviceBattery() {
   const regionDevices = devices.filter((d) => d.contentLanguage === selectedRegion);
   if (regionDevices.length === 0) return null;
 
+  // Global stats
+  const totalAll = regionDevices.length;
+  const globalCounts: Record<DeviceStatus, number> = { normal: 0, shadowban: 0, suspended: 0, unconnected: 0 };
+  for (const d of regionDevices) globalCounts[classifyDevice(d)]++;
+
   return (
-    <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1">
-      {languages.map((lang) => {
-        const filtered = regionDevices.filter((d) => d.targetAudience === lang.code);
-        if (filtered.length === 0) return null;
+    <div className="mb-3">
+      {/* Global summary bar */}
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-xs font-bold text-neutral-700">{totalAll}대</span>
+        <div className="flex-1 max-w-md h-2 rounded-full bg-neutral-100 overflow-hidden flex">
+          {(["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[]).map((s) => {
+            if (globalCounts[s] === 0) return null;
+            return (
+              <div
+                key={s}
+                className={`${statusConfig[s].bg} transition-all duration-500`}
+                style={{ width: `${(globalCounts[s] / totalAll) * 100}%` }}
+              />
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-3">
+          {(["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[]).map((s) => {
+            if (globalCounts[s] === 0) return null;
+            return (
+              <span key={s} className={`inline-flex items-center gap-1 text-[11px] font-medium ${statusConfig[s].text}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[s].bg}`} />
+                {statusConfig[s].label} {globalCounts[s]}
+              </span>
+            );
+          })}
+        </div>
+      </div>
 
-        const total = filtered.length;
-        const counts: Record<DeviceStatus, number> = { normal: 0, shadowban: 0, suspended: 0, unconnected: 0 };
-        for (const d of filtered) counts[classifyDevice(d)]++;
+      {/* Per-language mini bars */}
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+        {languages.map((lang) => {
+          const filtered = regionDevices.filter((d) => d.targetAudience === lang.code);
+          if (filtered.length === 0) return null;
 
-        const segments = (["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[])
-          .map((s) => ({ status: s, count: counts[s] }))
-          .filter((s) => s.count > 0);
+          const total = filtered.length;
+          const counts: Record<DeviceStatus, number> = { normal: 0, shadowban: 0, suspended: 0, unconnected: 0 };
+          for (const d of filtered) counts[classifyDevice(d)]++;
+          const normalPct = Math.round((counts.normal / total) * 100);
 
-        const normalPct = Math.round((counts.normal / total) * 100);
-
-        return (
-          <div key={lang.code} className="flex items-center gap-1.5">
-            <CircleFlag countryCode={lang.countryCode} size={13} />
-            <span className="text-[11px] font-semibold text-neutral-500 w-12 truncate">{lang.label}</span>
-
-            {/* Battery gauge */}
-            <div className="flex items-center">
-              <div className="relative w-28 h-4 rounded-[3px] border-2 border-neutral-300 bg-neutral-100 overflow-hidden">
-                <div className="absolute inset-[1.5px] flex gap-px rounded-[1.5px] overflow-hidden">
-                  {segments.map((seg) => (
+          return (
+            <div key={lang.code} className="flex items-center gap-1.5">
+              <CircleFlag countryCode={lang.countryCode} size={12} />
+              <span className="text-[10px] font-medium text-neutral-500 w-10 truncate">{lang.label}</span>
+              <div className="w-16 h-1.5 rounded-full bg-neutral-100 overflow-hidden flex">
+                {(["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[]).map((s) => {
+                  if (counts[s] === 0) return null;
+                  return (
                     <div
-                      key={seg.status}
-                      className={`${statusConfig[seg.status].bg} transition-all duration-300`}
-                      style={{ flex: seg.count }}
+                      key={s}
+                      className={`${statusConfig[s].bg}`}
+                      style={{ width: `${(counts[s] / total) * 100}%` }}
                     />
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-              <div className="w-[3px] h-2 rounded-r-[1.5px] bg-neutral-300 -ml-px" />
+              <span className="text-[10px] font-semibold text-neutral-400 tabular-nums">{normalPct}% <span className="text-neutral-300">{counts.normal}/{total}</span></span>
             </div>
-
-            <span className="text-[11px] font-bold text-neutral-500 tabular-nums w-7">{normalPct}%</span>
-            <span className="text-[10px] text-neutral-400 tabular-nums">{counts.normal}/{total}</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -108,10 +133,6 @@ interface ActionItem {
   slotIndex?: number;
 }
 
-const LANG_COUNTRY: Record<string, string> = {
-  en: "US", kr: "KR", jp: "JP", cn: "CN", es: "ES", fr: "FR", ge: "DE",
-};
-
 type ActionGroup = {
   type: ActionItem["type"];
   title: string;
@@ -127,8 +148,6 @@ function ActionChecklist() {
   const updateDeviceState = useDashboardStore((s) => s.updateDeviceState);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["unconnected"]));
-
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const items: ActionItem[] = [];
 
@@ -239,88 +258,47 @@ function ActionChecklist() {
     }
   };
 
-  const toggleCollapse = (type: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  };
-
-  // Group items by language within each group
-  const groupByLang = (groupItems: ActionItem[]) => {
-    const byLang: Record<string, ActionItem[]> = {};
-    for (const item of groupItems) {
-      if (!byLang[item.langLabel]) byLang[item.langLabel] = [];
-      byLang[item.langLabel].push(item);
-    }
-    return byLang;
-  };
+  const sbGroup = groups.find((g) => g.type === "sb_ready");
+  const susGroup = groups.find((g) => g.type === "suspended");
+  const uncGroup = groups.find((g) => g.type === "unconnected");
 
   return (
-    <div className="mb-4 flex flex-col gap-2">
-      {groups.map((group) => {
-        if (group.items.length === 0) return null;
-        const isCollapsed = collapsed.has(group.type);
-        const byLang = groupByLang(group.items);
-
-        return (
-          <div key={group.type} className={`rounded-lg border px-3 py-2 ${group.bgColor}`}>
+    <div className="mb-3 flex flex-wrap items-start gap-2">
+      {/* SB ready — most important, gets its own card */}
+      {sbGroup && sbGroup.items.length > 0 && (
+        <div className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-bold text-orange-600 uppercase mr-1">SB해제 {sbGroup.items.length}</span>
+          {sbGroup.items.map((item) => (
             <button
-              onClick={() => toggleCollapse(group.type)}
-              className="flex items-center gap-1.5 w-full text-left"
+              key={item.id}
+              onClick={() => handleCheck(item)}
+              disabled={processing.has(item.id)}
+              className={`rounded px-1.5 py-0.5 text-[11px] font-medium bg-white border border-orange-200 hover:border-orange-400 text-orange-600 transition-colors cursor-pointer ${
+                processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
+              }`}
             >
-              {isCollapsed
-                ? <ChevronRight size={14} className="text-neutral-400" />
-                : <ChevronDown size={14} className="text-neutral-400" />
-              }
-              <span className={`text-xs font-bold uppercase ${group.color}`}>
-                {group.title}
-              </span>
-              <span className="text-[11px] font-semibold text-neutral-400 ml-1">
-                {group.items.length}
-              </span>
-              {isCollapsed && (
-                <span className="text-[11px] text-neutral-400 ml-2 truncate">
-                  {group.items.slice(0, 5).map((i) => i.label).join(", ")}
-                  {group.items.length > 5 ? ` ...` : ""}
-                </span>
-              )}
+              {item.label}
             </button>
+          ))}
+        </div>
+      )}
 
-            {!isCollapsed && (
-              <div className="flex flex-wrap items-start gap-x-5 gap-y-1.5 mt-2">
-                {Object.entries(byLang).map(([lang, langItems]) => {
-                  const langCode = languages.find((l) => l.label === lang)?.code ?? "";
-                  const countryCode = LANG_COUNTRY[langCode] ?? langCode.toUpperCase();
-                  return (
-                    <div key={lang} className="flex items-center gap-1.5">
-                      <CircleFlag countryCode={countryCode} size={13} />
-                      <span className="text-[11px] font-semibold text-neutral-500 mr-0.5">{lang}</span>
-                      <div className="flex flex-wrap gap-1">
-                        {langItems.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => handleCheck(item)}
-                            disabled={processing.has(item.id)}
-                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium bg-white border border-neutral-200 hover:border-neutral-400 transition-colors cursor-pointer ${
-                              processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
-                            } ${group.color}`}
-                            title={item.type === "sb_ready" ? "클릭하여 SB 해제" : item.type === "suspended" ? "클릭하여 정지 해제" : "클릭하여 숨기기"}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {/* Suspended — compact inline */}
+      {susGroup && susGroup.items.length > 0 && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 flex items-center gap-1.5">
+          <span className="text-[11px] font-bold text-red-500 uppercase">정지 {susGroup.items.length}</span>
+          <span className="text-[11px] text-red-400">
+            {susGroup.items.map((i) => i.label).join(" ")}
+          </span>
+        </div>
+      )}
+
+      {/* Unconnected — just a count badge */}
+      {uncGroup && uncGroup.items.length > 0 && (
+        <div className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 flex items-center gap-1.5">
+          <span className="text-[11px] font-bold text-neutral-400 uppercase">계정미등록 {uncGroup.items.length}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -373,7 +351,7 @@ export default function Home() {
       </div>
 
       <main className="mx-auto max-w-[1400px] px-4 sm:px-8 py-4">
-        <DeviceBattery />
+        <StatusOverview />
         <ActionChecklist />
         <DeviceTable />
       </main>
