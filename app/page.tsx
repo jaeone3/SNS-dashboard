@@ -9,7 +9,8 @@ import { useDashboardStore } from "@/stores/dashboard-store";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { ToastContainer } from "@/components/common/ToastContainer";
 import { toast } from "@/stores/toast-store";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { CircleFlag } from "@/components/common/CircleFlag";
 import type { Device } from "@/types";
 
 /* ─── Device status helpers ─── */
@@ -39,7 +40,7 @@ const statusConfig: Record<DeviceStatus, { bg: string; text: string; label: stri
   unconnected: { bg: "bg-neutral-300", text: "text-neutral-400", label: "미연결" },
 };
 
-/* ─── Battery Status (all languages) ─── */
+/* ─── Status Overview (all languages) ─── */
 function DeviceBattery() {
   const devices = useDashboardStore((s) => s.devices);
   const selectedRegion = useDashboardStore((s) => s.selectedRegion);
@@ -50,7 +51,7 @@ function DeviceBattery() {
   if (regionDevices.length === 0) return null;
 
   return (
-    <div className="mb-4 flex flex-col gap-1.5">
+    <div className="mb-4 flex flex-col gap-2">
       {languages.map((lang) => {
         const filtered = regionDevices.filter((d) => d.targetAudience === lang.code);
         if (filtered.length === 0) return null;
@@ -67,27 +68,25 @@ function DeviceBattery() {
 
         return (
           <div key={lang.code} className="flex items-center gap-3">
-            <span className="text-xs font-bold text-neutral-600 w-14 shrink-0 truncate">{lang.label}</span>
-
-            {/* Battery shell */}
-            <div className="flex items-center w-40">
-              <div className="relative flex-1 h-5 rounded-[4px] border-2 border-neutral-300 bg-neutral-100 overflow-hidden">
-                <div className="absolute inset-[2px] flex gap-[1px] rounded-[2px] overflow-hidden">
-                  {segments.map((seg) => (
-                    <div
-                      key={seg.status}
-                      className={`${statusConfig[seg.status].bg} transition-all duration-300`}
-                      style={{ flex: seg.count }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="w-[4px] h-2.5 rounded-r-[2px] bg-neutral-300 -ml-[1px]" />
+            <div className="flex items-center gap-1.5 w-20 shrink-0">
+              <CircleFlag countryCode={lang.countryCode} size={14} />
+              <span className="text-xs font-semibold text-neutral-500 truncate">{lang.label}</span>
             </div>
 
-            <span className="text-xs font-semibold text-neutral-500 w-8">{normalPct}%</span>
+            {/* Modern progress bar */}
+            <div className="flex-1 max-w-48 h-2 rounded-full bg-neutral-100 overflow-hidden flex">
+              {segments.map((seg) => (
+                <div
+                  key={seg.status}
+                  className={`${statusConfig[seg.status].bg} transition-all duration-500 first:rounded-l-full last:rounded-r-full`}
+                  style={{ width: `${(seg.count / total) * 100}%` }}
+                />
+              ))}
+            </div>
 
-            <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-neutral-600 w-8 tabular-nums">{normalPct}%</span>
+
+            <div className="flex items-center gap-2">
               {segments.map((seg) => (
                 <span
                   key={seg.status}
@@ -117,6 +116,18 @@ interface ActionItem {
   slotIndex?: number;
 }
 
+const LANG_COUNTRY: Record<string, string> = {
+  en: "US", kr: "KR", jp: "JP", cn: "CN", es: "ES", fr: "FR", ge: "DE",
+};
+
+type ActionGroup = {
+  type: ActionItem["type"];
+  title: string;
+  color: string;
+  bgColor: string;
+  items: ActionItem[];
+};
+
 function ActionChecklist() {
   const devices = useDashboardStore((s) => s.devices);
   const selectedRegion = useDashboardStore((s) => s.selectedRegion);
@@ -124,6 +135,7 @@ function ActionChecklist() {
   const updateDeviceState = useDashboardStore((s) => s.updateDeviceState);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const items: ActionItem[] = [];
@@ -137,7 +149,6 @@ function ActionChecklist() {
 
   for (const d of filtered) {
     const langLabel = langMap[d.targetAudience] ?? d.targetAudience;
-    // SB ready to lift
     for (const p of ["tiktok", "instagram", "youtube"] as const) {
       for (let i = 0; i < (d.state[p]?.length ?? 0); i++) {
         const slot = d.state[p]?.[i];
@@ -153,7 +164,7 @@ function ActionChecklist() {
             type: "sb_ready",
             deviceId: d.id,
             deviceNumber: d.number,
-            label: `#${d.number} ${pLabel}${i + 1} @${slot.username} — SB ${daysElapsed}일 경과, 해제가능`,
+            label: `#${d.number} ${pLabel}${i + 1} @${slot.username} · ${daysElapsed}일`,
             langLabel,
             platform: p,
             slotIndex: i,
@@ -162,19 +173,17 @@ function ActionChecklist() {
       }
     }
 
-    // Suspended
     if (d.state.suspended) {
       items.push({
         id: `sus-${d.id}`,
         type: "suspended",
         deviceId: d.id,
         deviceNumber: d.number,
-        label: `#${d.number} — 정지됨`,
+        label: `#${d.number}`,
         langLabel,
       });
     }
 
-    // Unconnected (no accounts, not suspended)
     if (!d.state.suspended) {
       let hasAccount = false;
       for (const p of ["tiktok", "instagram", "youtube"] as const) {
@@ -189,7 +198,7 @@ function ActionChecklist() {
           type: "unconnected",
           deviceId: d.id,
           deviceNumber: d.number,
-          label: `#${d.number} — 미연결`,
+          label: `#${d.number}`,
           langLabel,
         });
       }
@@ -199,8 +208,14 @@ function ActionChecklist() {
   const visibleItems = items.filter((item) => !dismissed.has(item.id));
   if (visibleItems.length === 0) return null;
 
-  const typeOrder: Record<string, number> = { sb_ready: 0, suspended: 1, unconnected: 2 };
-  visibleItems.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+  const groups: ActionGroup[] = [
+    { type: "sb_ready", title: "SB 해제 가능", color: "text-orange-600", bgColor: "bg-orange-50 border-orange-200", items: [] },
+    { type: "suspended", title: "정지됨", color: "text-red-500", bgColor: "bg-red-50 border-red-200", items: [] },
+    { type: "unconnected", title: "미연결", color: "text-neutral-400", bgColor: "bg-neutral-50 border-neutral-200", items: [] },
+  ];
+  for (const item of visibleItems) {
+    groups.find((g) => g.type === item.type)?.items.push(item);
+  }
 
   const handleCheck = async (item: ActionItem) => {
     if (processing.has(item.id)) return;
@@ -232,41 +247,87 @@ function ActionChecklist() {
     }
   };
 
-  const typeStyle: Record<string, string> = {
-    sb_ready: "text-orange-600",
-    suspended: "text-red-500",
-    unconnected: "text-neutral-500",
+  const toggleCollapse = (type: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  // Group items by language within each group
+  const groupByLang = (groupItems: ActionItem[]) => {
+    const byLang: Record<string, ActionItem[]> = {};
+    for (const item of groupItems) {
+      if (!byLang[item.langLabel]) byLang[item.langLabel] = [];
+      byLang[item.langLabel].push(item);
+    }
+    return byLang;
   };
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-3 mb-4">
-      <h3 className="text-xs font-bold text-neutral-500 uppercase mb-2">
-        할 일 · {visibleItems.length}
-      </h3>
-      <div className="flex flex-col gap-0.5">
-        {visibleItems.map((item) => (
-          <label
-            key={item.id}
-            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-neutral-50 cursor-pointer transition-colors ${
-              processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
-            }`}
-          >
-            <input
-              type="checkbox"
-              className="rounded w-4 h-4 cursor-pointer accent-emerald-500"
-              checked={false}
-              onChange={() => handleCheck(item)}
-              disabled={processing.has(item.id)}
-            />
-            <span className="inline-flex items-center gap-1.5 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-medium text-neutral-500">
-              {item.langLabel}
-            </span>
-            <span className={`text-sm ${typeStyle[item.type] ?? "text-neutral-600"}`}>
-              {item.label}
-            </span>
-          </label>
-        ))}
-      </div>
+    <div className={`mb-4 grid grid-cols-1 items-start gap-3 ${
+      groups.filter((g) => g.items.length > 0).length >= 3 ? "sm:grid-cols-3" :
+      groups.filter((g) => g.items.length > 0).length === 2 ? "sm:grid-cols-2" : ""
+    }`}>
+      {groups.map((group) => {
+        if (group.items.length === 0) return null;
+        const isCollapsed = collapsed.has(group.type);
+        const byLang = groupByLang(group.items);
+
+        return (
+          <div key={group.type} className={`rounded-lg border p-3 ${group.bgColor}`}>
+            <button
+              onClick={() => toggleCollapse(group.type)}
+              className="flex items-center gap-1.5 w-full text-left mb-1.5"
+            >
+              {isCollapsed
+                ? <ChevronRight size={14} className="text-neutral-400" />
+                : <ChevronDown size={14} className="text-neutral-400" />
+              }
+              <span className={`text-xs font-bold uppercase ${group.color}`}>
+                {group.title}
+              </span>
+              <span className="text-[11px] font-semibold text-neutral-400 ml-auto">
+                {group.items.length}
+              </span>
+            </button>
+
+            {!isCollapsed && (
+              <div className="flex flex-col gap-2 mt-1">
+                {Object.entries(byLang).map(([lang, langItems]) => {
+                  const langCode = languages.find((l) => l.label === lang)?.code ?? "";
+                  const countryCode = LANG_COUNTRY[langCode] ?? langCode.toUpperCase();
+                  return (
+                    <div key={lang}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <CircleFlag countryCode={countryCode} size={14} />
+                        <span className="text-[11px] font-semibold text-neutral-500">{lang}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {langItems.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleCheck(item)}
+                            disabled={processing.has(item.id)}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium bg-white border border-neutral-200 hover:border-neutral-400 transition-colors cursor-pointer ${
+                              processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
+                            } ${group.color}`}
+                            title={item.type === "sb_ready" ? "클릭하여 SB 해제" : item.type === "suspended" ? "클릭하여 정지 해제" : "클릭하여 숨기기"}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
