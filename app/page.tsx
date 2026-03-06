@@ -135,7 +135,7 @@ function ActionChecklist() {
   const updateDeviceState = useDashboardStore((s) => s.updateDeviceState);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["unconnected"]));
 
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const items: ActionItem[] = [];
@@ -267,20 +267,17 @@ function ActionChecklist() {
   };
 
   return (
-    <div className={`mb-4 grid grid-cols-1 items-start gap-3 ${
-      groups.filter((g) => g.items.length > 0).length >= 3 ? "sm:grid-cols-3" :
-      groups.filter((g) => g.items.length > 0).length === 2 ? "sm:grid-cols-2" : ""
-    }`}>
+    <div className="mb-4 flex flex-col gap-2">
       {groups.map((group) => {
         if (group.items.length === 0) return null;
         const isCollapsed = collapsed.has(group.type);
         const byLang = groupByLang(group.items);
 
         return (
-          <div key={group.type} className={`rounded-lg border p-3 ${group.bgColor}`}>
+          <div key={group.type} className={`rounded-lg border px-3 py-2 ${group.bgColor}`}>
             <button
               onClick={() => toggleCollapse(group.type)}
-              className="flex items-center gap-1.5 w-full text-left mb-1.5"
+              className="flex items-center gap-1.5 w-full text-left"
             >
               {isCollapsed
                 ? <ChevronRight size={14} className="text-neutral-400" />
@@ -289,29 +286,33 @@ function ActionChecklist() {
               <span className={`text-xs font-bold uppercase ${group.color}`}>
                 {group.title}
               </span>
-              <span className="text-[11px] font-semibold text-neutral-400 ml-auto">
+              <span className="text-[11px] font-semibold text-neutral-400 ml-1">
                 {group.items.length}
               </span>
+              {isCollapsed && (
+                <span className="text-[11px] text-neutral-400 ml-2 truncate">
+                  {group.items.slice(0, 5).map((i) => i.label).join(", ")}
+                  {group.items.length > 5 ? ` ...` : ""}
+                </span>
+              )}
             </button>
 
             {!isCollapsed && (
-              <div className="flex flex-col gap-2 mt-1">
+              <div className="flex flex-wrap items-start gap-x-5 gap-y-1.5 mt-2">
                 {Object.entries(byLang).map(([lang, langItems]) => {
                   const langCode = languages.find((l) => l.label === lang)?.code ?? "";
                   const countryCode = LANG_COUNTRY[langCode] ?? langCode.toUpperCase();
                   return (
-                    <div key={lang}>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <CircleFlag countryCode={countryCode} size={14} />
-                        <span className="text-[11px] font-semibold text-neutral-500">{lang}</span>
-                      </div>
+                    <div key={lang} className="flex items-center gap-1.5">
+                      <CircleFlag countryCode={countryCode} size={13} />
+                      <span className="text-[11px] font-semibold text-neutral-500 mr-0.5">{lang}</span>
                       <div className="flex flex-wrap gap-1">
                         {langItems.map((item) => (
                           <button
                             key={item.id}
                             onClick={() => handleCheck(item)}
                             disabled={processing.has(item.id)}
-                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium bg-white border border-neutral-200 hover:border-neutral-400 transition-colors cursor-pointer ${
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium bg-white border border-neutral-200 hover:border-neutral-400 transition-colors cursor-pointer ${
                               processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
                             } ${group.color}`}
                             title={item.type === "sb_ready" ? "클릭하여 SB 해제" : item.type === "suspended" ? "클릭하여 정지 해제" : "클릭하여 숨기기"}
