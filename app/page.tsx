@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { RegionSelector } from "@/components/dashboard/RegionSelector";
-import { LanguageTabs } from "@/components/dashboard/LanguageTabs";
+
 import { DeviceTable } from "@/components/dashboard/DeviceTable";
 import { useDashboardStore } from "@/stores/dashboard-store";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
@@ -366,7 +366,6 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <RegionSelector />
-              <LanguageTabs />
             </div>
             <DashboardHeader />
           </div>

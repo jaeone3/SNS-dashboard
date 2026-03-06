@@ -11,6 +11,7 @@ import {
 import { DeviceTableRow } from "./DeviceTableRow";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { LanguageTabs } from "./LanguageTabs";
 import type { Device } from "@/types";
 
 const TikTokIcon = ({ size = 14 }: { size?: number }) => (
@@ -192,10 +193,11 @@ export const DeviceTable = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search toggle — magnifying glass icon */}
-      <div className="flex items-center gap-2">
+      {/* Language tabs + Search */}
+      <div className="flex items-center gap-3">
+        <LanguageTabs />
         {searchOpen ? (
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full max-w-xs ml-auto">
             <input
               ref={searchRef}
               type="text"
@@ -214,7 +216,7 @@ export const DeviceTable = () => {
         ) : (
           <button
             onClick={() => setSearchOpen(true)}
-            className="rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+            className="ml-auto rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
             title="검색 ( / )"
           >
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
