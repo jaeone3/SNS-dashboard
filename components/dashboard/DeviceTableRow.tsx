@@ -12,6 +12,7 @@ interface DeviceTableRowProps {
   device: Device;
   selected?: boolean;
   onToggleSelect?: () => void;
+  adbConnected?: boolean;
 }
 
 function daysElapsed(dateStr: string | null): number | null {
@@ -118,7 +119,7 @@ const AccountCell = ({
   );
 };
 
-export const DeviceTableRow = ({ device, selected, onToggleSelect }: DeviceTableRowProps) => {
+export const DeviceTableRow = ({ device, selected, onToggleSelect, adbConnected }: DeviceTableRowProps) => {
   const updateDeviceState = useDashboardStore((s) => s.updateDeviceState);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -301,7 +302,12 @@ export const DeviceTableRow = ({ device, selected, onToggleSelect }: DeviceTable
       <TableRow className={`hidden md:table-row transition-colors hover:bg-neutral-50/80 ${rowBg}`}>
         <TableCell className="px-2 py-2">
           <div className="flex flex-col items-center gap-1">
-            <span className="font-mono text-sm font-bold tabular-nums">#{device.number}</span>
+            <div className="flex items-center gap-1">
+              {adbConnected !== undefined && (
+                <span className={`w-1.5 h-1.5 rounded-full ${adbConnected ? "bg-emerald-400" : "bg-red-400"}`} title={adbConnected ? "ADB 연결됨" : "ADB 미연결"} />
+              )}
+              <span className="font-mono text-sm font-bold tabular-nums">#{device.number}</span>
+            </div>
             <div className="flex items-center gap-1">
               <CircleFlag countryCode={device.vpnRegion} size={12} />
               <span className="text-[10px] text-neutral-400 leading-tight">{device.vpnCity}</span>

@@ -18,7 +18,11 @@ interface DashboardState {
   selectedDeviceIds: Set<string>;
   searchQuery: string;
 
+  adbConnected: Set<string>;
+  adbLoading: boolean;
+
   fetchAll: () => Promise<void>;
+  fetchAdbStatus: () => Promise<void>;
   updateDeviceState: (deviceId: string, state: Partial<DeviceState>) => Promise<void>;
   bulkUpdateDeviceState: (deviceIds: string[], state: Partial<DeviceState>) => Promise<void>;
 
@@ -48,6 +52,21 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
 
   selectedDeviceIds: new Set<string>(),
   searchQuery: "",
+
+  adbConnected: new Set<string>(),
+  adbLoading: false,
+
+  fetchAdbStatus: async () => {
+    set({ adbLoading: true });
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/adb-status`);
+      if (!res.ok) throw new Error("ADB check failed");
+      const data = await res.json();
+      set({ adbConnected: new Set(data.connected ?? []), adbLoading: false });
+    } catch {
+      set({ adbLoading: false });
+    }
+  },
 
   fetchAll: async () => {
     const current = get();

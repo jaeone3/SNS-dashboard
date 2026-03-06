@@ -140,6 +140,9 @@ export const DeviceTable = () => {
   const selectedLanguage = useDashboardStore((s) => s.selectedLanguage);
   const searchQuery = useDashboardStore((s) => s.searchQuery);
   const setSearchQuery = useDashboardStore((s) => s.setSearchQuery);
+  const adbConnected = useDashboardStore((s) => s.adbConnected);
+  const adbLoading = useDashboardStore((s) => s.adbLoading);
+  const fetchAdbStatus = useDashboardStore((s) => s.fetchAdbStatus);
   const [showSuspended, setShowSuspended] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -214,15 +217,27 @@ export const DeviceTable = () => {
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="ml-auto rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-            title="검색 ( / )"
-          >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-            </svg>
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={fetchAdbStatus}
+              disabled={adbLoading}
+              className="rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors disabled:opacity-50"
+              title="ADB 연결 체크"
+            >
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={adbLoading ? "animate-spin" : ""}>
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+              title="검색 ( / )"
+            >
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
@@ -309,6 +324,7 @@ export const DeviceTable = () => {
                     <DeviceTableRow
                       key={device.id}
                       device={device}
+                      adbConnected={adbConnected.size > 0 ? adbConnected.has(device.id) : undefined}
                     />
                   ))}
                 </TableBody>
@@ -336,7 +352,7 @@ export const DeviceTable = () => {
                       </colgroup>
                       <TableBody>
                         {filteredSuspended.map((device) => (
-                          <DeviceTableRow key={device.id} device={device} />
+                          <DeviceTableRow key={device.id} device={device} adbConnected={adbConnected.size > 0 ? adbConnected.has(device.id) : undefined} />
                         ))}
                       </TableBody>
                     </Table>
