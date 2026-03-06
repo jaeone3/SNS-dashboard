@@ -34,10 +34,10 @@ function classifyDevice(d: Device): DeviceStatus {
 }
 
 const statusConfig: Record<DeviceStatus, { bg: string; text: string; label: string }> = {
-  normal:      { bg: "bg-emerald-500", text: "text-emerald-600", label: "정상" },
-  shadowban:   { bg: "bg-orange-400",  text: "text-orange-500",  label: "쉐밴" },
-  suspended:   { bg: "bg-red-500",     text: "text-red-500",     label: "정지" },
-  unconnected: { bg: "bg-neutral-300", text: "text-neutral-400", label: "미연결" },
+  normal:      { bg: "bg-teal-300",    text: "text-teal-600",    label: "정상" },
+  shadowban:   { bg: "bg-amber-300",   text: "text-amber-600",   label: "쉐밴" },
+  suspended:   { bg: "bg-rose-300",    text: "text-rose-500",    label: "정지" },
+  unconnected: { bg: "bg-stone-200",   text: "text-stone-400",   label: "미연결" },
 };
 
 /* ─── Status Overview ─── */
@@ -59,8 +59,8 @@ function StatusOverview() {
     <div className="mb-3">
       {/* Global summary bar */}
       <div className="flex items-center gap-3 mb-2">
-        <span className="text-xs font-bold text-neutral-700">{totalAll}대</span>
-        <div className="flex-1 max-w-md h-2 rounded-full bg-neutral-100 overflow-hidden flex">
+        <span className="text-xs font-semibold text-stone-600">{totalAll}대</span>
+        <div className="flex-1 max-w-md h-2 rounded-full bg-stone-100 overflow-hidden flex">
           {(["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[]).map((s) => {
             if (globalCounts[s] === 0) return null;
             return (
@@ -99,8 +99,8 @@ function StatusOverview() {
           return (
             <div key={lang.code} className="flex items-center gap-1.5">
               <CircleFlag countryCode={lang.countryCode} size={12} />
-              <span className="text-[10px] font-medium text-neutral-500 w-10 truncate">{lang.label}</span>
-              <div className="w-16 h-1.5 rounded-full bg-neutral-100 overflow-hidden flex">
+              <span className="text-[10px] font-medium text-stone-500 w-10 truncate">{lang.label}</span>
+              <div className="w-16 h-1.5 rounded-full bg-stone-100 overflow-hidden flex">
                 {(["normal", "shadowban", "suspended", "unconnected"] as DeviceStatus[]).map((s) => {
                   if (counts[s] === 0) return null;
                   return (
@@ -112,7 +112,7 @@ function StatusOverview() {
                   );
                 })}
               </div>
-              <span className="text-[10px] font-semibold text-neutral-400 tabular-nums">{normalPct}% <span className="text-neutral-300">{counts.normal}/{total}</span></span>
+              <span className="text-[10px] font-semibold text-stone-400 tabular-nums">{normalPct}% <span className="text-stone-300">{counts.normal}/{total}</span></span>
             </div>
           );
         })}
@@ -266,14 +266,14 @@ function ActionChecklist() {
     <div className="mb-3 flex flex-wrap items-start gap-2">
       {/* SB ready — most important, gets its own card */}
       {sbGroup && sbGroup.items.length > 0 && (
-        <div className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-orange-600 uppercase mr-1">SB해제 {sbGroup.items.length}</span>
+        <div className="rounded-md bg-amber-50 border border-amber-200/60 px-2.5 py-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-amber-700 mr-1">SB해제 {sbGroup.items.length}</span>
           {sbGroup.items.map((item) => (
             <button
               key={item.id}
               onClick={() => handleCheck(item)}
               disabled={processing.has(item.id)}
-              className={`rounded px-1.5 py-0.5 text-[11px] font-medium bg-white border border-orange-200 hover:border-orange-400 text-orange-600 transition-colors cursor-pointer ${
+              className={`rounded px-1.5 py-0.5 text-[11px] font-medium bg-white/80 border border-amber-200/60 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer ${
                 processing.has(item.id) ? "opacity-50 pointer-events-none" : ""
               }`}
             >
@@ -283,20 +283,18 @@ function ActionChecklist() {
         </div>
       )}
 
-      {/* Suspended — compact inline */}
       {susGroup && susGroup.items.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 flex items-center gap-1.5">
-          <span className="text-[11px] font-bold text-red-500 uppercase">정지 {susGroup.items.length}</span>
-          <span className="text-[11px] text-red-400">
+        <div className="rounded-md bg-rose-50 border border-rose-200/60 px-2.5 py-1.5 flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-rose-500">정지 {susGroup.items.length}</span>
+          <span className="text-[11px] text-rose-400">
             {susGroup.items.map((i) => i.label).join(" ")}
           </span>
         </div>
       )}
 
-      {/* Unconnected — just a count badge */}
       {uncGroup && uncGroup.items.length > 0 && (
-        <div className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 flex items-center gap-1.5">
-          <span className="text-[11px] font-bold text-neutral-400 uppercase">계정미등록 {uncGroup.items.length}</span>
+        <div className="rounded-md bg-stone-50 border border-stone-200/60 px-2.5 py-1.5 flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-stone-400">계정미등록 {uncGroup.items.length}</span>
         </div>
       )}
     </div>
@@ -319,14 +317,14 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-[#fbfbfa]">
         <main className="mx-auto max-w-[1400px] px-4 sm:px-8 py-6 sm:py-10">
-          <div className="mt-20 flex flex-col items-center justify-center gap-4 text-neutral-500">
-            <AlertCircle size={28} className="text-red-400" />
-            <p className="text-sm text-red-500">{error}</p>
+          <div className="mt-20 flex flex-col items-center justify-center gap-4 text-stone-500">
+            <AlertCircle size={28} className="text-rose-300" />
+            <p className="text-sm text-rose-400">{error}</p>
             <button
               onClick={() => fetchAll()}
-              className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+              className="rounded-md bg-stone-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-700"
             >
               다시 시도
             </button>
@@ -337,10 +335,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Sticky top bar — compact navigation only */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-neutral-100">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-8 py-3">
+    <div className="min-h-screen bg-[#fbfbfa]">
+      {/* Sticky top bar — Notion style */}
+      <div className="sticky top-0 z-30 bg-[#fbfbfa]/95 backdrop-blur-sm border-b border-stone-200/60">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-8 py-2.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <RegionSelector />

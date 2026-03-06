@@ -30,8 +30,8 @@ export const DashboardHeader = () => {
   };
 
   return (
-    <div className="flex items-center gap-2 text-neutral-400">
-      <div className="flex items-center gap-2 text-neutral-400">
+    <div className="flex items-center gap-2 text-stone-400">
+      <div className="flex items-center gap-2 text-stone-400">
         {lastUpdated && (
           <span className="text-[11px]">
             <RelativeTime date={lastUpdated} />
@@ -40,7 +40,7 @@ export const DashboardHeader = () => {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="rounded-md p-1.5 hover:bg-neutral-100 transition-colors disabled:opacity-50"
+          className="rounded-md p-1.5 hover:bg-stone-100 transition-colors disabled:opacity-50"
           title="새로고침"
         >
           <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />

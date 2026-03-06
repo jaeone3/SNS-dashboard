@@ -207,11 +207,11 @@ export const DeviceTable = () => {
               placeholder="검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 pr-8 text-sm focus:border-black focus:outline-none"
+              className="w-full rounded-md border border-stone-300 px-3 py-2 pr-8 text-sm focus:border-black focus:outline-none"
             />
             <button
               onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
             >
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
@@ -221,7 +221,7 @@ export const DeviceTable = () => {
             <button
               onClick={fetchAdbStatus}
               disabled={adbLoading}
-              className="rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors disabled:opacity-50"
+              className="rounded-md p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors disabled:opacity-50"
               title="ADB 연결 체크"
             >
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={adbLoading ? "animate-spin" : ""}>
@@ -230,7 +230,7 @@ export const DeviceTable = () => {
             </button>
             <button
               onClick={() => setSearchOpen(true)}
-              className="rounded-md p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+              className="rounded-md p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
               title="검색 ( / )"
             >
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -266,13 +266,13 @@ export const DeviceTable = () => {
 
         return (
           <div key={groupKey}>
-            <h3 className="mb-2 text-sm font-semibold tracking-wide text-neutral-500 uppercase">
+            <h3 className="mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase">
               {groupKey}
-              <span className="ml-2 text-xs text-neutral-400">
+              <span className="ml-2 text-xs text-stone-400">
                 ({allDevices.length} devices)
               </span>
             </h3>
-            <div className="w-full overflow-x-auto rounded-lg border border-neutral-200">
+            <div className="w-full overflow-x-auto rounded-lg border border-stone-200">
               <Table className="w-full table-fixed">
                 <colgroup>
                   <col style={{ width: '140px' }} />
@@ -282,38 +282,38 @@ export const DeviceTable = () => {
                 </colgroup>
                 <TableHeader>
                   {/* Platform group headers */}
-                  <TableRow className="bg-neutral-100 hidden md:table-row border-b-0">
-                    <TableHead className="bg-neutral-100" />
-                    <TableHead colSpan={3} className="text-center border-l border-neutral-200 bg-neutral-100">
-                      <span className="inline-flex items-center gap-1.5 justify-center text-neutral-800 text-xs font-bold">
+                  <TableRow className="bg-stone-100 hidden md:table-row border-b-0">
+                    <TableHead className="bg-stone-100" />
+                    <TableHead colSpan={3} className="text-center border-l border-stone-200 bg-stone-100">
+                      <span className="inline-flex items-center gap-1.5 justify-center text-stone-800 text-xs font-bold">
                         <TikTokIcon size={13} /> TikTok
                       </span>
                     </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l border-neutral-200 bg-neutral-100">
+                    <TableHead colSpan={3} className="text-center border-l border-stone-200 bg-stone-100">
                       <span className="inline-flex items-center gap-1.5 justify-center text-pink-600 text-xs font-bold">
                         <InstagramIcon size={13} /> Instagram
                       </span>
                     </TableHead>
-                    <TableHead colSpan={3} className="text-center border-l border-neutral-200 bg-neutral-100">
+                    <TableHead colSpan={3} className="text-center border-l border-stone-200 bg-stone-100">
                       <span className="inline-flex items-center gap-1.5 justify-center text-red-600 text-xs font-bold">
                         <YouTubeIcon size={13} /> YouTube
                       </span>
                     </TableHead>
                   </TableRow>
-                  <TableRow className="bg-neutral-50 hidden md:table-row">
-                    <TableHead className="text-center px-2 text-xs font-bold text-neutral-600">#</TableHead>
+                  <TableRow className="bg-stone-50 hidden md:table-row">
+                    <TableHead className="text-center px-2 text-xs font-bold text-stone-600">#</TableHead>
                     {[1, 2, 3].map((n) => (
-                      <TableHead key={`tt-h-${n}`} className={`text-center text-xs font-semibold text-neutral-500 px-1 ${n === 1 ? "border-l border-neutral-200" : ""}`}>
+                      <TableHead key={`tt-h-${n}`} className={`text-center text-xs font-semibold text-stone-500 px-1 ${n === 1 ? "border-l border-stone-200" : ""}`}>
                         {n}
                       </TableHead>
                     ))}
                     {[1, 2, 3].map((n) => (
-                      <TableHead key={`ig-h-${n}`} className={`text-center text-xs font-semibold text-neutral-500 px-1 ${n === 1 ? "border-l border-neutral-200" : ""}`}>
+                      <TableHead key={`ig-h-${n}`} className={`text-center text-xs font-semibold text-stone-500 px-1 ${n === 1 ? "border-l border-stone-200" : ""}`}>
                         {n}
                       </TableHead>
                     ))}
                     {[1, 2, 3].map((n) => (
-                      <TableHead key={`yt-h-${n}`} className={`text-center text-xs font-semibold text-neutral-500 px-1 ${n === 1 ? "border-l border-neutral-200" : ""}`}>
+                      <TableHead key={`yt-h-${n}`} className={`text-center text-xs font-semibold text-stone-500 px-1 ${n === 1 ? "border-l border-stone-200" : ""}`}>
                         {n}
                       </TableHead>
                     ))}
@@ -336,7 +336,7 @@ export const DeviceTable = () => {
               <div className="mt-2">
                 <button
                   onClick={() => setShowSuspended(!showSuspended)}
-                  className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-600 transition-colors"
                 >
                   <span className={`transition-transform ${showSuspended ? "rotate-90" : ""}`}>▶</span>
                   <span>정지된 디바이스 ({filteredSuspended.length})</span>

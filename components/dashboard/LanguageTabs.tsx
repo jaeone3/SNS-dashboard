@@ -24,7 +24,7 @@ export const LanguageTabs = () => {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wide mr-0.5">타겟</span>
+      <span className="text-[11px] font-semibold text-stone-400 tracking-wide mr-0.5">타겟</span>
       {sorted.map((lang) => {
         const isActive = lang.code === selectedLanguage;
         return (
@@ -32,10 +32,10 @@ export const LanguageTabs = () => {
             key={lang.id}
             onClick={() => setLanguage(lang.code)}
             className={cn(
-              "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-all",
               isActive
-                ? "bg-black text-white"
-                : "bg-neutral-200 text-neutral-500 hover:bg-neutral-300"
+                ? "bg-stone-800 text-white shadow-sm"
+                : "bg-stone-100 text-stone-500 hover:bg-stone-200"
             )}
           >
             <CircleFlag countryCode={lang.countryCode} size={16} />

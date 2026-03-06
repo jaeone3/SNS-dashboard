@@ -31,7 +31,7 @@ function daysRemaining(dateStr: string | null, totalDays: number): number | null
 /** Platform border class for the first slot column of each platform group */
 const platformBorderClass = (_platform: string, index: number) => {
   if (index !== 0) return "";
-  return "border-l border-neutral-200";
+  return "border-l border-stone-200";
 };
 
 const AccountCell = ({
@@ -49,7 +49,7 @@ const AccountCell = ({
     return (
       <button
         onClick={onClickUsername}
-        className="w-full flex items-center justify-center min-h-[52px] rounded text-neutral-300 hover:text-neutral-500 hover:bg-neutral-50 transition-colors text-lg font-light"
+        className="w-full flex items-center justify-center min-h-[52px] rounded text-stone-300 hover:text-stone-500 hover:bg-stone-50 transition-colors text-lg font-light"
       >
         +
       </button>
@@ -60,7 +60,7 @@ const AccountCell = ({
   const sbDone = sbElapsed !== null && sbElapsed >= 3;
 
   return (
-    <div className="group relative flex flex-col items-center gap-1 rounded px-1 py-2 min-h-[52px] justify-center hover:bg-neutral-50 transition-colors">
+    <div className="group relative flex flex-col items-center gap-1 rounded px-1 py-2 min-h-[52px] justify-center hover:bg-stone-50 transition-colors">
       {/* Username — click to open modal */}
       <button
         onClick={onClickUsername}
@@ -69,7 +69,7 @@ const AccountCell = ({
             ? "text-red-400 line-through"
             : slot.shadowban
               ? "text-orange-600 font-semibold"
-              : "text-neutral-800"
+              : "text-stone-800"
         }`}
         title={`@${slot.username} (클릭: 상세)`}
       >
@@ -91,7 +91,7 @@ const AccountCell = ({
 
       {/* Past shadowban count — only when NOT currently banned */}
       {slot.shadowbanCount > 0 && !slot.shadowban && (
-        <span className="text-[10px] text-neutral-400 font-medium">
+        <span className="text-[10px] text-stone-400 font-medium">
           SB×{slot.shadowbanCount}
         </span>
       )}
@@ -278,18 +278,18 @@ export const DeviceTableRow = ({ device, selected, onToggleSelect, adbConnected 
     <div className="flex items-center gap-2">
       <span className="font-mono text-sm font-bold tabular-nums">#{device.number}</span>
       <CircleFlag countryCode={device.vpnRegion} size={14} />
-      <span className="text-[11px] text-neutral-500">{device.vpnCity}</span>
+      <span className="text-[11px] text-stone-500">{device.vpnCity}</span>
       <div className="flex items-center gap-1.5 ml-auto">
         {device.state.isNew ? (
-          <button onClick={handleToggleNew} disabled={saving} className="rounded-md bg-blue-500 text-white px-3 py-1 text-xs font-bold hover:bg-blue-600 disabled:opacity-50 transition-colors">
+          <button onClick={handleToggleNew} disabled={saving} className="rounded-md bg-sky-300 text-sky-800 px-3 py-1 text-xs font-bold hover:bg-sky-400 disabled:opacity-50 transition-colors">
             NEW D-{newDaysLeft}
           </button>
         ) : (
-          <button onClick={handleToggleNew} disabled={saving} className="rounded-md bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 disabled:opacity-50 transition-colors">
+          <button onClick={handleToggleNew} disabled={saving} className="rounded-md bg-stone-100 px-3 py-1 text-xs font-medium text-stone-400 hover:bg-stone-200 hover:text-stone-600 disabled:opacity-50 transition-colors">
             NEW
           </button>
         )}
-        <button onClick={handleToggleSuspend} disabled={saving} className={`rounded-md px-3 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${device.state.suspended ? "bg-red-500 text-white hover:bg-red-600" : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"}`}>
+        <button onClick={handleToggleSuspend} disabled={saving} className={`rounded-md px-3 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${device.state.suspended ? "bg-rose-300 text-rose-800 hover:bg-rose-400" : "bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-500"}`}>
           정지
         </button>
       </div>
@@ -299,7 +299,7 @@ export const DeviceTableRow = ({ device, selected, onToggleSelect, adbConnected 
   return (
     <>
       {/* Desktop */}
-      <TableRow className={`hidden md:table-row transition-colors hover:bg-neutral-50/80 ${rowBg}`}>
+      <TableRow className={`hidden md:table-row transition-colors hover:bg-stone-50/80 ${rowBg}`}>
         <TableCell className="px-2 py-2">
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-1">
@@ -310,19 +310,19 @@ export const DeviceTableRow = ({ device, selected, onToggleSelect, adbConnected 
             </div>
             <div className="flex items-center gap-1">
               <CircleFlag countryCode={device.vpnRegion} size={12} />
-              <span className="text-[10px] text-neutral-400 leading-tight">{device.vpnCity}</span>
+              <span className="text-[10px] text-stone-400 leading-tight">{device.vpnCity}</span>
             </div>
             <div className="flex items-center gap-1 mt-0.5">
               {device.state.isNew ? (
-                <button onClick={handleToggleNew} disabled={saving} className="rounded bg-blue-500 text-white px-2 py-0.5 text-[11px] font-bold hover:bg-blue-600 disabled:opacity-50 transition-colors">
+                <button onClick={handleToggleNew} disabled={saving} className="rounded bg-sky-300 text-sky-800 px-2 py-0.5 text-[11px] font-bold hover:bg-sky-400 disabled:opacity-50 transition-colors">
                   NEW D-{newDaysLeft}
                 </button>
               ) : (
-                <button onClick={handleToggleNew} disabled={saving} className="rounded bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 disabled:opacity-50 transition-colors">
+                <button onClick={handleToggleNew} disabled={saving} className="rounded bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-400 hover:bg-stone-200 hover:text-stone-600 disabled:opacity-50 transition-colors">
                   NEW
                 </button>
               )}
-              <button onClick={handleToggleSuspend} disabled={saving} className={`rounded px-2 py-0.5 text-[11px] font-bold transition-colors disabled:opacity-50 ${device.state.suspended ? "bg-red-500 text-white hover:bg-red-600" : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"}`}>
+              <button onClick={handleToggleSuspend} disabled={saving} className={`rounded px-2 py-0.5 text-[11px] font-bold transition-colors disabled:opacity-50 ${device.state.suspended ? "bg-rose-300 text-rose-800 hover:bg-rose-400" : "bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-500"}`}>
                 정지
               </button>
             </div>
@@ -337,18 +337,18 @@ export const DeviceTableRow = ({ device, selected, onToggleSelect, adbConnected 
       {/* Mobile */}
       <tr className="md:hidden">
         <td colSpan={10}>
-          <div className={`rounded-lg border p-3 mb-2 ${rowBg || "bg-white"} ${device.state.suspended ? "border-red-200" : "border-neutral-200"}`}>
+          <div className={`rounded-lg border p-3 mb-2 ${rowBg || "bg-white"} ${device.state.suspended ? "border-red-200" : "border-stone-200"}`}>
             {deviceHeader}
             <div className="mt-2 grid grid-cols-3 gap-1">
-              <span className="text-[10px] text-neutral-400 font-bold col-span-3 uppercase">TikTok</span>
+              <span className="text-[10px] text-stone-400 font-bold col-span-3 uppercase">TikTok</span>
               {[0, 1, 2].map((i) => (
                 <AccountCell key={`m-tt-${i}`} slot={device.state.tiktok?.[i] ?? null} deviceSuspended={device.state.suspended} onClickUsername={() => openModal("tiktok", i)} onQuickShadowban={() => handleQuickShadowban("tiktok", i)} />
               ))}
-              <span className="text-[10px] text-neutral-400 font-bold col-span-3 mt-1 uppercase">Instagram</span>
+              <span className="text-[10px] text-stone-400 font-bold col-span-3 mt-1 uppercase">Instagram</span>
               {[0, 1, 2].map((i) => (
                 <AccountCell key={`m-ig-${i}`} slot={device.state.instagram?.[i] ?? null} deviceSuspended={device.state.suspended} onClickUsername={() => openModal("instagram", i)} onQuickShadowban={() => handleQuickShadowban("instagram", i)} />
               ))}
-              <span className="text-[10px] text-neutral-400 font-bold col-span-3 mt-1 uppercase">YouTube</span>
+              <span className="text-[10px] text-stone-400 font-bold col-span-3 mt-1 uppercase">YouTube</span>
               {[0, 1, 2].map((i) => (
                 <AccountCell key={`m-yt-${i}`} slot={device.state.youtube?.[i] ?? null} deviceSuspended={device.state.suspended} onClickUsername={() => openModal("youtube", i)} onQuickShadowban={() => handleQuickShadowban("youtube", i)} />
               ))}
